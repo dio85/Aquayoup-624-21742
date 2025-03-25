@@ -24,6 +24,7 @@
 #include "Logger.h"
 #include "StringFormat.h"
 #include "Common.h"
+#include "AsioHacksFwd.h"
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/strand.hpp>
 
@@ -33,6 +34,14 @@
 #include <memory>
 
 #define LOGGER_ROOT "root"
+
+namespace Trinity
+{
+    namespace Asio
+    {
+        class IoContext;
+    }
+}
 
 class TC_COMMON_API Log
 {
@@ -46,7 +55,7 @@ class TC_COMMON_API Log
 
         static Log* instance();
 
-        void Initialize(boost::asio::io_service* ioService);
+        void Initialize(Trinity::Asio::IoContext* ioContext);
         void SetSynchronous();  // Not threadsafe - should only be called from main() after all threads are joined
         void LoadFromConfig();
         void Close();
@@ -112,8 +121,8 @@ class TC_COMMON_API Log
         std::string m_logsDir;
         std::string m_logsTimestamp;
 
-        boost::asio::io_service* _ioService;
-        boost::asio::strand* _strand;
+        Trinity::Asio::IoContext* _ioContext;
+        Trinity::Asio::Strand* _strand;
 };
 
 inline Logger const* Log::GetLoggerByType(std::string const& type) const

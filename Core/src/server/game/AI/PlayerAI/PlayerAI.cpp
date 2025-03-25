@@ -130,7 +130,7 @@ void PlayerAI::DoAutoAttackIfReady()
         DoMeleeAttackIfReady();
 }
 
-struct UncontrolledTargetSelectPredicate : public std::unary_function<Unit*, bool>
+struct UncontrolledTargetSelectPredicate
 {
     bool operator()(Unit const* target) const
     {

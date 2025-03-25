@@ -23,12 +23,14 @@
 #include "AppenderConsole.h"
 #include "AppenderFile.h"
 #include "LogOperation.h"
+#include "Strand.h"
 
 #include <cstdarg>
 #include <cstdio>
 #include <sstream>
+#include <iostream>
 
-Log::Log() : AppenderId(0), lowestLogLevel(LOG_LEVEL_FATAL), _ioService(nullptr), _strand(nullptr)
+Log::Log() : AppenderId(0), lowestLogLevel(LOG_LEVEL_FATAL), _ioContext(nullptr), _strand(nullptr)
 {
     m_logsTimestamp = "_" + GetTimestampStr();
     RegisterAppender<AppenderConsole>();
@@ -229,14 +231,16 @@ void Log::write(std::unique_ptr<LogMessage>&& msg) const
 {
     Logger const* logger = GetLoggerByType(msg->type);
 
-    if (_ioService)
+    if (_ioContext)
     {
-        auto logOperation = std::shared_ptr<LogOperation>(new LogOperation(logger, std::move(msg)));
-
-        _ioService->post(_strand->wrap([logOperation](){ logOperation->call(); }));
+        std::shared_ptr<LogOperation> logOperation = std::make_shared<LogOperation>(logger, std::move(msg));
+        Trinity::Asio::post(*_ioContext, Trinity::Asio::bind_executor(*_strand, [logOperation]() { logOperation->call(); }));
     }
     else
         logger->write(msg.get());
+
+    std::cout << "";
+    std::cerr << "";
 }
 
 std::string Log::GetTimestampStr()
@@ -327,12 +331,12 @@ Log* Log::instance()
     return &instance;
 }
 
-void Log::Initialize(boost::asio::io_service* ioService)
+void Log::Initialize(Trinity::Asio::IoContext* ioContext)
 {
-    if (ioService)
+    if (ioContext)
     {
-        _ioService = ioService;
-        _strand = new boost::asio::strand(*ioService);
+        _ioContext = ioContext;
+        _strand = new Trinity::Asio::Strand(*ioContext);
     }
 
     LoadFromConfig();
@@ -342,7 +346,7 @@ void Log::SetSynchronous()
 {
     delete _strand;
     _strand = nullptr;
-    _ioService = nullptr;
+    _ioContext = nullptr;
 }
 
 void Log::LoadFromConfig()

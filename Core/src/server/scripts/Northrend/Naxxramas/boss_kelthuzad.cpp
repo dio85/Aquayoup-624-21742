@@ -251,7 +251,7 @@ Position const PosWeavers[MAX_WEAVERS] =
 };
 
 // predicate function to select not charmed target
-struct NotCharmedTargetSelector : public std::unary_function<Unit*, bool>
+struct NotCharmedTargetSelector
 {
     NotCharmedTargetSelector() { }
 

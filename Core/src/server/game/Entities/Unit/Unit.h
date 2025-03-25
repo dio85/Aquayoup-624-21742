@@ -635,7 +635,7 @@ enum WeaponAttackType : uint8
 
 enum CombatRating
 {
-    CR_UNUSED_1                         = 0,
+    CR_UNUSED_0                         = 0,
     CR_DEFENSE_SKILL                    = 1, // Removed in 4.0.1
     CR_DODGE                            = 2,
     CR_PARRY                            = 3,

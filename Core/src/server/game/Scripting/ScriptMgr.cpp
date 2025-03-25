@@ -457,7 +457,7 @@ class CreatureGameObjectScriptRegistrySwapHooks
                 fn(object.second);
         };
 
-        AIFunctionMapWorker<typename std::decay<decltype(evaluator)>::type> worker(std::move(evaluator));
+        AIFunctionMapWorker<std::decay_t<decltype(evaluator)>> worker(std::move(evaluator));
         TypeContainerVisitor<decltype(worker), MapStoredObjectTypesContainer> visitor(worker);
 
         sMapMgr->DoForAllMaps([&](Map* map)

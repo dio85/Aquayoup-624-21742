@@ -1,3 +1,4 @@
+
 # Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
 #
 # This file is free software; as a special exception the author gives
@@ -61,6 +62,8 @@ target_include_directories(common
     ${CMAKE_CURRENT_BINARY_DIR})
 
 target_link_libraries(common
+  PRIVATE
+    process
   PUBLIC
     boost
     cppformat
