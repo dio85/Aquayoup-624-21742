@@ -28,6 +28,7 @@
 #include "httpget.h"
 #include "httppost.h"
 #include "soapH.h"
+#include "Resolver.h"
 
 int ns1__executeCommand(soap*, char*, char**) { return SOAP_OK; }
 
@@ -41,8 +42,9 @@ int32 handle_post_plugin(soap* soapClient)
     return sLoginService.HandlePost(soapClient);
 }
 
-bool LoginRESTService::Start(boost::asio::io_service& ioService)
+bool LoginRESTService::Start(Trinity::Asio::IoContext* ioContext)
 {
+    _ioContext = ioContext;
     _bindIP = sConfigMgr->GetStringDefault("BindIP", "0.0.0.0");
     _port = sConfigMgr->GetIntDefault("LoginREST.Port", 8081);
     if (_port < 0 || _port > 0xFFFF)
@@ -51,31 +53,28 @@ bool LoginRESTService::Start(boost::asio::io_service& ioService)
         _port = 8081;
     }
 
-    boost::system::error_code ec;
-    boost::asio::ip::tcp::resolver resolver(ioService);
+    Trinity::Asio::Resolver resolver(*ioContext);
     boost::asio::ip::tcp::resolver::iterator end;
 
     std::string configuredAddress = sConfigMgr->GetStringDefault("LoginREST.ExternalAddress", "127.0.0.1");
-    boost::asio::ip::tcp::resolver::query externalAddressQuery(boost::asio::ip::tcp::v4(), configuredAddress, std::to_string(_port));
-    boost::asio::ip::tcp::resolver::iterator endPoint = resolver.resolve(externalAddressQuery, ec);
-    if (endPoint == end || ec)
+    Optional<boost::asio::ip::tcp::endpoint> externalAddress = resolver.Resolve(boost::asio::ip::tcp::v4(), configuredAddress, std::to_string(_port));
+    if (!externalAddress)
     {
         TC_LOG_ERROR("server.rest", "Could not resolve LoginREST.ExternalAddress %s", configuredAddress.c_str());
         return false;
     }
 
-    _externalAddress = endPoint->endpoint();
+    _externalAddress = *externalAddress;
 
     configuredAddress = sConfigMgr->GetStringDefault("LoginREST.LocalAddress", "127.0.0.1");
-    boost::asio::ip::tcp::resolver::query localAddressQuery(boost::asio::ip::tcp::v4(), configuredAddress, std::to_string(_port));
-    endPoint = resolver.resolve(localAddressQuery, ec);
-    if (endPoint == end || ec)
+    Optional<boost::asio::ip::tcp::endpoint> localAddress = resolver.Resolve(boost::asio::ip::tcp::v4(), configuredAddress, std::to_string(_port));
+    if (!localAddress)
     {
         TC_LOG_ERROR("server.rest", "Could not resolve LoginREST.ExternalAddress %s", configuredAddress.c_str());
         return false;
     }
 
-    _localAddress = endPoint->endpoint();
+    _localAddress = *localAddress;
 
     // set up form inputs
     Battlenet::JSON::Login::FormInput* input;
@@ -97,9 +96,7 @@ bool LoginRESTService::Start(boost::asio::io_service& ioService)
     input->set_type("submit");
     input->set_label("Log In");
 
-    _loginTicketCleanupTimer = new boost::asio::deadline_timer(ioService);
-    _loginTicketCleanupTimer->expires_from_now(boost::posix_time::seconds(10));
-    _loginTicketCleanupTimer->async_wait(std::bind(&LoginRESTService::CleanupLoginTickets, this, std::placeholders::_1));
+    _loginTicketDuration = sConfigMgr->GetIntDefault("LoginREST.TicketDuration", 3600);
 
     _thread = std::thread(std::bind(&LoginRESTService::Run, this));
     return true;
@@ -108,7 +105,6 @@ bool LoginRESTService::Start(boost::asio::io_service& ioService)
 void LoginRESTService::Stop()
 {
     _stopped = true;
-    _loginTicketCleanupTimer->cancel();
     _thread.join();
 }
 
@@ -340,28 +336,6 @@ void LoginRESTService::AddLoginTicket(std::string const& id, std::unique_ptr<Bat
     std::unique_lock<std::mutex> lock(_loginTicketMutex);
 
     _validLoginTickets[id] = { id, std::move(accountInfo), time(nullptr) + 10 };
-}
-
-void LoginRESTService::CleanupLoginTickets(boost::system::error_code const& error)
-{
-    if (error)
-        return;
-
-    time_t now = time(nullptr);
-
-    {
-        std::unique_lock<std::mutex> lock(_loginTicketMutex);
-        for (auto itr = _validLoginTickets.begin(); itr != _validLoginTickets.end();)
-        {
-            if (itr->second.ExpiryTime < now)
-                itr = _validLoginTickets.erase(itr);
-            else
-                ++itr;
-        }
-    }
-
-    _loginTicketCleanupTimer->expires_from_now(boost::posix_time::seconds(10));
-    _loginTicketCleanupTimer->async_wait(std::bind(&LoginRESTService::CleanupLoginTickets, this, std::placeholders::_1));
 }
 
 LoginRESTService::LoginTicket& LoginRESTService::LoginTicket::operator=(LoginTicket&& right)

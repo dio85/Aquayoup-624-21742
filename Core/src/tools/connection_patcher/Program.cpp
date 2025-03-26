@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2012-2014 Arctium Emulation <http://arctium.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
@@ -25,7 +26,7 @@
 #include "Patterns/Mac.hpp"
 #include "Patterns/Windows.hpp"
 
-#include <CompilerDefs.h>
+#include "CompilerDefs.h"
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/program_options.hpp>
@@ -158,41 +159,41 @@ int main(int argc, char** argv)
 
         switch (patcher.GetType())
         {
-            case Constants::BinaryTypes::Pe32:
-                std::cout << "Win32 client...\n";
+        case Constants::BinaryTypes::Pe32:
+            std::cout << "Win32 client...\n";
 
-                boost::algorithm::replace_all(renamed_binary_path, ".exe", "_Patched.exe");
-                do_patches<Patches::Windows::x86, Patterns::Windows::x86>
-                    (&patcher, renamed_binary_path, wowBuild);
-                WriteCertificateBundle(boost::filesystem::path(binary_path).remove_filename() / "tc_bundle.txt");
-                break;
-            case Constants::BinaryTypes::Pe64:
-                std::cout << "Win64 client...\n";
+            boost::algorithm::replace_all(renamed_binary_path, ".exe", "_Patched.exe");
+            do_patches<Patches::Windows::x86, Patterns::Windows::x86>
+                (&patcher, renamed_binary_path, wowBuild);
+            WriteCertificateBundle(boost::filesystem::path(binary_path).remove_filename() / "tc_bundle.txt");
+            break;
+        case Constants::BinaryTypes::Pe64:
+            std::cout << "Win64 client...\n";
 
-                boost::algorithm::replace_all(renamed_binary_path, ".exe", "_Patched.exe");
-                do_patches<Patches::Windows::x64, Patterns::Windows::x64>
-                    (&patcher, renamed_binary_path, wowBuild);
-                WriteCertificateBundle(boost::filesystem::path(binary_path).remove_filename() / "tc_bundle.txt");
-                break;
-            case Constants::BinaryTypes::Mach64:
-                std::cout << "Mac client...\n";
+            boost::algorithm::replace_all(renamed_binary_path, ".exe", "_Patched.exe");
+            do_patches<Patches::Windows::x64, Patterns::Windows::x64>
+                (&patcher, renamed_binary_path, wowBuild);
+            WriteCertificateBundle(boost::filesystem::path(binary_path).remove_filename() / "tc_bundle.txt");
+            break;
+        case Constants::BinaryTypes::Mach64:
+            std::cout << "Mac client...\n";
 
-                boost::algorithm::replace_all(renamed_binary_path, ".app", " Patched.app");
-                Helper::CopyDir(boost::filesystem::path(binary_path).parent_path()/*MacOS*/.parent_path()/*Contents*/.parent_path()
-                        , boost::filesystem::path(renamed_binary_path).parent_path()/*MacOS*/.parent_path()/*Contents*/.parent_path()
-                        );
+            boost::algorithm::replace_all(renamed_binary_path, ".app", " Patched.app");
+            Helper::CopyDir(boost::filesystem::path(binary_path).parent_path()/*MacOS*/.parent_path()/*Contents*/.parent_path()
+                , boost::filesystem::path(renamed_binary_path).parent_path()/*MacOS*/.parent_path()/*Contents*/.parent_path()
+            );
 
-                do_patches<Patches::Mac::x64, Patterns::Mac::x64>
-                    (&patcher, renamed_binary_path, wowBuild);
+            do_patches<Patches::Mac::x64, Patterns::Mac::x64>
+                (&patcher, renamed_binary_path, wowBuild);
 
-                {
-                    namespace fs = boost::filesystem;
-                    fs::permissions(renamed_binary_path, fs::add_perms | fs::others_exe | fs::group_exe | fs::owner_exe);
-                }
-                WriteCertificateBundle(boost::filesystem::path(binary_path).parent_path()/*MacOS*/.parent_path()/*Contents*/.parent_path()/*World of Warcraft.app*/.parent_path() / "tc_bundle.txt");
-                break;
-            default:
-                throw std::runtime_error("Type: " + std::to_string(static_cast<uint32_t>(patcher.GetType())) + " not supported!");
+            {
+                namespace fs = boost::filesystem;
+                fs::permissions(renamed_binary_path, fs::add_perms | fs::others_exe | fs::group_exe | fs::owner_exe);
+            }
+            WriteCertificateBundle(boost::filesystem::path(binary_path).parent_path()/*MacOS*/.parent_path()/*Contents*/.parent_path()/*World of Warcraft.app*/.parent_path() / "tc_bundle.txt");
+            break;
+        default:
+            throw std::runtime_error("Type: " + std::to_string(static_cast<uint32_t>(patcher.GetType())) + " not supported!");
         }
 
         std::cout << "Successfully created your patched binaries.\n";

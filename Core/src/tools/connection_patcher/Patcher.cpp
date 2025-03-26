@@ -17,6 +17,7 @@
  */
 
 #include "Patcher.hpp"
+#include <stddef.h>
 
 namespace Connection_Patcher
 {

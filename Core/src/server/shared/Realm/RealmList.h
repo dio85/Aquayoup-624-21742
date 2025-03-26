@@ -25,8 +25,20 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/deadline_timer.hpp>
+#include <shared_mutex>
+#include "Resolver.h"
 
 using namespace boost::asio;
+
+namespace boost
+{
+    class shared_mutex;
+
+    namespace system
+    {
+        class error_code;
+    }
+}
 
 struct RealmBuildInfo
 {
@@ -60,6 +72,15 @@ namespace JSON
     }
 }
 
+namespace Trinity
+{
+    namespace Asio
+    {
+        class IoContext;
+        class DeadlineTimer;
+    }
+}
+
 /// Storage object for the list of realms on the server
 class TC_SHARED_API RealmList
 {
@@ -70,7 +91,7 @@ public:
 
     ~RealmList();
 
-    void Initialize(boost::asio::io_service& ioService, uint32 updateInterval);
+    void Initialize(Trinity::Asio::IoContext& ioContext, uint32 updateInterval);
     void Close();
 
     RealmMap const& GetRealms() const { return _realms; }
@@ -88,14 +109,15 @@ private:
     RealmList();
 
     void UpdateRealms(boost::system::error_code const& error);
-    void UpdateRealm(Battlenet::RealmHandle const& id, uint32 build, const std::string& name, ip::address const& address, ip::address const& localAddr,
-        ip::address const& localSubmask, uint16 port, uint8 icon, RealmFlags flag, uint8 timezone, AccountTypes allowedSecurityLevel, float population);
+    void UpdateRealm(Realm& realm, Battlenet::RealmHandle const& id, uint32 build, std::string const& name,
+        boost::asio::ip::address&& address, boost::asio::ip::address&& localAddr, boost::asio::ip::address&& localSubmask,
+        uint16 port, uint8 icon, RealmFlags flag, uint8 timezone, AccountTypes allowedSecurityLevel, float population);
 
     RealmMap _realms;
     std::unordered_set<std::string> _subRegions;
     uint32 _updateInterval;
-    boost::asio::deadline_timer* _updateTimer;
-    boost::asio::ip::tcp::resolver* _resolver;
+    std::unique_ptr<Trinity::Asio::DeadlineTimer> _updateTimer;
+    std::unique_ptr<Trinity::Asio::Resolver> _resolver;
 };
 
 #define sRealmList RealmList::Instance()

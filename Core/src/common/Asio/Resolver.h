@@ -33,7 +33,7 @@ namespace Trinity
         class Resolver
         {
         public:
-            explicit Resolver(IoContext& ioContext) : _impl(ioContext) { }
+            explicit Resolver(IoContext& ioContext) : _impl(ioContext) {}
 
             Optional<boost::asio::ip::tcp::endpoint> Resolve(boost::asio::ip::tcp const& protocol, std::string const& host, std::string const& service)
             {

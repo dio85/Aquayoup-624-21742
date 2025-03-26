@@ -30,6 +30,7 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "Player.h"
+#include "IpAddress.h"
 #include "Vehicle.h"
 #include "ObjectMgr.h"
 #include "GuildMgr.h"
@@ -715,8 +716,8 @@ void WorldSession::Handle_EarlyProccess(WorldPacket& recvPacket)
 void WorldSession::SendConnectToInstance(WorldPackets::Auth::ConnectToSerial serial)
 {
     boost::system::error_code ignored_error;
-    boost::asio::ip::tcp::endpoint instanceAddress = realm.GetAddressForClient(boost::asio::ip::address::from_string(GetRemoteAddress(), ignored_error));
-    instanceAddress.port(sWorld->getIntConfig(CONFIG_PORT_INSTANCE));
+    boost::asio::ip::address instanceAddress = realm.GetAddressForClient(Trinity::Net::make_address(GetRemoteAddress(), ignored_error));
+    boost::asio::ip::tcp::endpoint instanceEndpoint(instanceAddress, sWorld->getIntConfig(CONFIG_PORT_INSTANCE));
 
     _instanceConnectKey.Fields.AccountId = GetAccountId();
     _instanceConnectKey.Fields.ConnectionType = CONNECTION_TYPE_INSTANCE;
@@ -725,7 +726,6 @@ void WorldSession::SendConnectToInstance(WorldPackets::Auth::ConnectToSerial ser
     WorldPackets::Auth::ConnectTo connectTo;
     connectTo.Key = _instanceConnectKey.Raw;
     connectTo.Serial = serial;
-    connectTo.Payload.Where = instanceAddress;
     connectTo.Con = CONNECTION_TYPE_INSTANCE;
 
     SendPacket(connectTo.Write());

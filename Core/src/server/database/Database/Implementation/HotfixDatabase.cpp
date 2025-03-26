@@ -56,7 +56,7 @@ void HotfixDatabaseConnection::DoPrepareStatements()
     // BattlePetSpecies.db2
     PrepareStatement(HOTFIX_SEL_BATTLE_PET_SPECIES, "SELECT ID, CreatureID, IconFileID, SummonSpellID, PetType, Source, Flags, SourceText, "
         "Description FROM battle_pet_species ORDER BY ID DESC", CONNECTION_SYNCH);
-    PREPARE_LOCALE_STMT(HOTFIX_SEL_BATTLE_PET_SPECIES, "SELECT ID, SourceText_lang, Description_lang FROM battle_pet_species_locale WHERE locale = ?", CONNECTION_SYNCH);
+    PREPARE_LOCALE_STMT(HOTFIX_SEL_BATTLE_PET_SPECIES, "SELECT ID, SourceText, Description FROM battle_pet_species_locale WHERE locale = ?", CONNECTION_SYNCH);
 
     // BattlePetSpeciesState.db2
     PrepareStatement(HOTFIX_SEL_BATTLE_PET_SPECIES_STATE, "SELECT ID, SpeciesID, State, Value FROM battle_pet_species_state ORDER BY ID DESC", CONNECTION_SYNCH);
@@ -83,8 +83,8 @@ void HotfixDatabaseConnection::DoPrepareStatements()
         "CreatureModelAlpha, TextureVariation1, TextureVariation2, TextureVariation3, PortraitTextureName, PortraitCreatureDisplayInfoID, SizeClass, "
         "BloodID, NPCSoundID, ParticleColorID, CreatureGeosetData, ObjectEffectPackageID, AnimReplacementSetID, Flags, Gender, StateSpellVisualKitID"
         " FROM creature_display_info ORDER BY ID DESC", CONNECTION_SYNCH);
-    PREPARE_LOCALE_STMT(HOTFIX_SEL_CREATURE_DISPLAY_INFO, "SELECT ID, TextureVariation1_lang, TextureVariation2_lang, TextureVariation3_lang, "
-        "PortraitTextureName_lang FROM creature_display_info_locale WHERE locale = ?", CONNECTION_SYNCH);
+    PREPARE_LOCALE_STMT(HOTFIX_SEL_CREATURE_DISPLAY_INFO, "SELECT ID, TextureVariation1, TextureVariation2, TextureVariation3, "
+        "PortraitTextureName FROM creature_display_info_locale WHERE locale = ?", CONNECTION_SYNCH);
 
     // CreatureType.db2
     PrepareStatement(HOTFIX_SEL_CREATURE_TYPE, "SELECT ID, Name, Flags FROM creature_type ORDER BY ID DESC", CONNECTION_SYNCH);

@@ -1,19 +1,20 @@
+
 /*
-* Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
-*
-* This program is free software; you can redistribute it and/or modify it
-* under the terms of the GNU General Public License as published by the
-* Free Software Foundation; either version 2 of the License, or (at your
-* option) any later version.
-*
-* This program is distributed in the hope that it will be useful, but WITHOUT
-* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-* more details.
-*
-* You should have received a copy of the GNU General Public License along
-* with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef METRIC_H__
 #define METRIC_H__
@@ -25,8 +26,6 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
-#include <stddef.h>
-#include "DeadlineTimer.h"
 
 namespace Trinity
 {
@@ -81,10 +80,10 @@ private:
     void ScheduleOverallStatusLog();
 
     static std::string FormatInfluxDBValue(bool value);
-    template<class T>
+    template <class T>
     static std::string FormatInfluxDBValue(T value);
     static std::string FormatInfluxDBValue(std::string const& value);
-    static std::string FormatInfluxDBValue(const char* value);
+    static std::string FormatInfluxDBValue(char const* value);
     static std::string FormatInfluxDBValue(double value);
     static std::string FormatInfluxDBValue(float value);
 
@@ -152,6 +151,5 @@ public:
         } while (0)                                                     \
         __pragma(warning(pop))
 #endif
-
 
 #endif // METRIC_H__

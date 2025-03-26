@@ -16,11 +16,11 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \addtogroup u2w User to World Communication
- *  @{
- *  \file WorldSocketMgr.h
- *  \author Derex <derex101@gmail.com>
- */
+ /** \addtogroup u2w User to World Communication
+  *  @{
+  *  \file WorldSocketMgr.h
+  *  \author Derex <derex101@gmail.com>
+  */
 
 #ifndef __WORLDSOCKETMGR_H
 #define __WORLDSOCKETMGR_H
@@ -40,12 +40,19 @@ public:
     static WorldSocketMgr& Instance();
 
     /// Start network, listen at address:port .
-    bool StartNetwork(boost::asio::io_service& service, std::string const& bindIp, uint16 port, int networkThreads) override;
+    bool StartWorldNetwork(Trinity::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, uint16 instancePort, int networkThreads);
 
     /// Stops all network threads, It will wait for all running threads .
     void StopNetwork() override;
 
     void OnSocketOpen(tcp::socket&& sock, uint32 threadIndex) override;
+
+    std::size_t GetApplicationSendBufferSize() const { return _socketApplicationSendBufferSize; }
+
+    bool StartNetwork(Trinity::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, int threadCount) override
+    {
+        return BaseSocketMgr::StartNetwork(ioContext, bindIp, port, threadCount);
+    }
 
 protected:
     WorldSocketMgr();
@@ -53,9 +60,12 @@ protected:
     NetworkThread<WorldSocket>* CreateThreads() const override;
 
 private:
+    // private, must not be called directly
+    
+
     AsyncAcceptor* _instanceAcceptor;
-    int32 _socketSendBufferSize;
-    int32 m_SockOutUBuff;
+    int32 _socketSystemSendBufferSize;
+    int32 _socketApplicationSendBufferSize;
     bool _tcpNoDelay;
 };
 

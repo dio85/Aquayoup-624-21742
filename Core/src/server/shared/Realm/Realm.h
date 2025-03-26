@@ -85,18 +85,21 @@ struct TC_SHARED_API Realm
 {
     Battlenet::RealmHandle Id;
     uint32 Build;
-    ip::address ExternalAddress;
-    ip::address LocalAddress;
-    ip::address LocalSubnetMask;
+    std::unique_ptr<boost::asio::ip::address> ExternalAddress;
+    std::unique_ptr<boost::asio::ip::address> LocalAddress;
+    std::unique_ptr<boost::asio::ip::address> LocalSubnetMask;
     uint16 Port;
     std::string Name;
+    std::string NormalizedName;
     uint8 Type;
     RealmFlags Flags;
     uint8 Timezone;
     AccountTypes AllowedSecurityLevel;
     float PopulationLevel;
 
-    ip::tcp::endpoint GetAddressForClient(ip::address const& clientAddr) const;
+    void SetName(std::string name);
+
+    boost::asio::ip::address GetAddressForClient(boost::asio::ip::address const& clientAddr) const;
     uint32 GetConfigId() const;
 
     static uint32 const ConfigIdByType[MAX_CLIENT_REALM_TYPE];

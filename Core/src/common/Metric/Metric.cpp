@@ -1,19 +1,19 @@
 /*
-* Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
-*
-* This program is free software; you can redistribute it and/or modify it
-* under the terms of the GNU General Public License as published by the
-* Free Software Foundation; either version 2 of the License, or (at your
-* option) any later version.
-*
-* This program is distributed in the hope that it will be useful, but WITHOUT
-* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-* more details.
-*
-* You should have received a copy of the GNU General Public License along
-* with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "Metric.h"
 #include "Common.h"
@@ -200,8 +200,8 @@ void Metric::ScheduleSend()
 {
     if (_enabled)
     {
-        _batchTimer->expires_after(std::chrono::seconds(_updateInterval));
-        _batchTimer->async_wait([this](boost::system::error_code const&) { SendBatch(); });
+        _batchTimer->expires_from_now(Seconds(_updateInterval));
+        _batchTimer->async_wait(std::bind(&Metric::SendBatch, this));
     }
     else
     {
@@ -215,7 +215,7 @@ void Metric::ScheduleSend()
 
 void Metric::ForceSend()
 {
-    // Send what's queued only if io_service is stopped (so only on shutdown)
+    // Send what's queued only if IoContext is stopped (so only on shutdown)
     if (_enabled && Trinity::Asio::get_io_context(*_batchTimer).stopped())
         SendBatch();
 }
@@ -224,7 +224,7 @@ void Metric::ScheduleOverallStatusLog()
 {
     if (_enabled)
     {
-        _overallStatusTimer->expires_after(std::chrono::seconds(_overallStatusTimerInterval));
+        _overallStatusTimer->expires_from_now(Seconds(_overallStatusTimerInterval));
         _overallStatusTimer->async_wait([this](const boost::system::error_code&)
             {
                 _overallStatusTimerTriggered = true;
@@ -249,7 +249,7 @@ std::string Metric::FormatInfluxDBValue(std::string const& value)
     return '"' + boost::replace_all_copy(value, "\"", "\\\"") + '"';
 }
 
-std::string Metric::FormatInfluxDBValue(const char* value)
+std::string Metric::FormatInfluxDBValue(char const* value)
 {
     return FormatInfluxDBValue(std::string(value));
 }
@@ -283,3 +283,12 @@ Metric* Metric::instance()
     static Metric instance;
     return &instance;
 }
+
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(int8);
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(uint8);
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(int16);
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(uint16);
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(int32);
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(uint32);
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(int64);
+template TC_COMMON_API std::string Metric::FormatInfluxDBValue(uint64);
