@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
@@ -16,59 +16,60 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/// \addtogroup Trinityd Trinity Daemon
-/// @{
-/// \file
+ /// \addtogroup Trinityd Trinity Daemon
+ /// @{
+ /// \file
 
 #include "Common.h"
-#include "DatabaseEnv.h"
-#include "IoContext.h"
+#include "AppenderDB.h"
 #include "AsyncAcceptor.h"
-#include "RASession.h"
-#include "Configuration/Config.h"
-#include "OpenSSLCrypto.h"
-#include "ProcessPriority.h"
+#include "BattlegroundMgr.h"
 #include "BigNumber.h"
-#include "World.h"
-#include "MapManager.h"
+#include "CliRunnable.h"
+#include "Configuration/Config.h"
+#include "DatabaseEnv.h"
+#include "DatabaseLoader.h"
+#include "DeadlineTimer.h"
+#include "GitRevision.h"
 #include "InstanceSaveMgr.h"
+#include "IoContext.h"
+#include "MapManager.h"
+#include "Metric.h"
+#include "MySQLThreading.h"
 #include "ObjectAccessor.h"
+#include "OpenSSLCrypto.h"
+#include "OutdoorPvP/OutdoorPvPMgr.h"
+#include "ProcessPriority.h"
+#include "RASession.h"
+#include "RealmList.h"
+#include "ScriptLoader.h"
 #include "ScriptMgr.h"
 #include "ScriptReloadMgr.h"
-#include "ScriptLoader.h"
-#include "OutdoorPvP/OutdoorPvPMgr.h"
-#include "BattlegroundMgr.h"
 #include "TCSoap.h"
-#include "CliRunnable.h"
-#include "GitRevision.h"
+#include "World.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
-#include "RealmList.h"
-#include "DatabaseLoader.h"
-#include "AppenderDB.h"
-#include "Metric.h"
 #include <openssl/opensslv.h>
 #include <openssl/crypto.h>
-#include <boost/asio/io_service.hpp>
-#include <boost/asio/deadline_timer.hpp>
-#include <boost/filesystem/path.hpp>
+#include <boost/asio/signal_set.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
 #include <google/protobuf/stubs/common.h>
-#include <boost/dll/runtime_symbol_info.hpp>
-#include <boost/algorithm/string/replace.hpp>
+#include <iostream>
+#include <csignal>
 
 using namespace boost::program_options;
 namespace fs = boost::filesystem;
 
 #ifndef _TRINITY_CORE_CONFIG
-    #define _TRINITY_CORE_CONFIG  "worldserver.conf"
+#define _TRINITY_CORE_CONFIG  "worldserver.conf"
 #endif
 
 #define WORLD_SLEEP_CONST 50
 
 #ifdef _WIN32
 #include "ServiceWin32.h"
-#include <boost/asio/signal_set.hpp>
 char serviceName[] = "worldserver";
 char serviceLongName[] = "TrinityCore world service";
 char serviceDescription[] = "TrinityCore World of Warcraft emulator world service";
@@ -78,19 +79,32 @@ char serviceDescription[] = "TrinityCore World of Warcraft emulator world servic
  *  1 - running
  *  2 - paused
  */
-//Stitch INFO: int m_ServiceStatus = -1; =1
 int m_ServiceStatus = -1;
 #endif
 
+class FreezeDetector
+{
+public:
+    FreezeDetector(Trinity::Asio::IoContext& ioContext, uint32 maxCoreStuckTime)
+        : _timer(ioContext), _worldLoopCounter(0), _lastChangeMsTime(0), _maxCoreStuckTimeInMs(maxCoreStuckTime) {
+    }
 
+    static void Start(std::shared_ptr<FreezeDetector> const& freezeDetector)
+    {
+        freezeDetector->_timer.expires_from_now(Seconds(5));
+        freezeDetector->_timer.async_wait(std::bind(&FreezeDetector::Handler, std::weak_ptr<FreezeDetector>(freezeDetector), std::placeholders::_1));
+    }
 
+    static void Handler(std::weak_ptr<FreezeDetector> freezeDetectorRef, boost::system::error_code const& error);
 
-Trinity::Asio::IoContext *ioContext;
-uint32 _worldLoopCounter(0);
-uint32 _lastChangeMsTime(0);
-uint32 _maxCoreStuckTimeInMs(0);
+private:
+    Trinity::Asio::DeadlineTimer _timer;
+    uint32 _worldLoopCounter;
+    uint32 _lastChangeMsTime;
+    uint32 _maxCoreStuckTimeInMs;
+};
 
-void SignalHandler(const boost::system::error_code& error, int signalNumber);
+void SignalHandler(boost::system::error_code const& error, int signalNumber);
 AsyncAcceptor* StartRaSocketAcceptor(Trinity::Asio::IoContext& ioContext);
 bool StartDB();
 void StopDB();
@@ -115,6 +129,8 @@ extern int main(int argc, char** argv)
 
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
+    std::shared_ptr<void> protobufHandle(nullptr, [](void*) { google::protobuf::ShutdownProtobufLibrary(); });
+
 #ifdef _WIN32
     if (configService.compare("install") == 0)
         return WinServiceInstall() ? 0 : 1;
@@ -126,8 +142,8 @@ extern int main(int argc, char** argv)
 
     std::string configError;
     if (!sConfigMgr->LoadInitial(configFile.generic_string(),
-                                 std::vector<std::string>(argv, argv + argc),
-                                 configError))
+        std::vector<std::string>(argv, argv + argc),
+        configError))
     {
         printf("Error in config file: %s\n", configError.c_str());
         return 1;
@@ -136,34 +152,34 @@ extern int main(int argc, char** argv)
     std::shared_ptr<Trinity::Asio::IoContext> ioContext = std::make_shared<Trinity::Asio::IoContext>();
 
     sLog->RegisterAppender<AppenderDB>();
-    // If logs are supposed to be handled async then we need to pass the io_service into the Log singleton
+    // If logs are supposed to be handled async then we need to pass the IoContext into the Log singleton
     sLog->Initialize(sConfigMgr->GetBoolDefault("Log.Async.Enable", false) ? ioContext.get() : nullptr);
 
     TC_LOG_INFO("server.worldserver", "%s (worldserver-daemon)", GitRevision::GetFullVersion());
     TC_LOG_INFO("server.worldserver", "<Ctrl-C> to stop.\n");
     TC_LOG_INFO("server.worldserver", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
     TC_LOG_INFO("server.worldserver", "xx Trinity 19/05/2016 - TrinityCore/tree/498725f3de8d18b26986c2c2e0ceec6c384a8016 xx");
-	TC_LOG_INFO("server.worldserver", "xx                                                                                xx");
-	TC_LOG_INFO("server.worldserver", "xx  Derniere maj du core 06/2022 - Stitch                                         xx");
     TC_LOG_INFO("server.worldserver", "xx                                                                                xx");
-	TC_LOG_INFO("server.worldserver", "xx * Toutes les Classes pour toutes les Races                                     xx");
-	TC_LOG_INFO("server.worldserver", "xx * Extension de classe Vampire pour le voleur                                   xx");
-	TC_LOG_INFO("server.worldserver", "xx * Extension de classe posture Chaos pour le DK                                 xx");
-	TC_LOG_INFO("server.worldserver", "xx * Rez sur le lieu de sa mort ou tp pdf                                         xx");
-	TC_LOG_INFO("server.worldserver", "xx * Solocraft perso adapte les stats aux instances suivant le nbr de joueurs     xx");
-	TC_LOG_INFO("server.worldserver", "xx * Pandaren : choix de la faction (quete & pnj change faction)                  xx");
-	TC_LOG_INFO("server.worldserver", "xx * PNJ change race,faction,apparence,panda                      NPC 15000142    xx");
-	TC_LOG_INFO("server.worldserver", "xx * Pet Demo utilisent desormais energie plutot que le mana                      xx");
-	TC_LOG_INFO("server.worldserver", "xx * Pet & FakePlayers donnent de l'XP et sont plus efficace                      xx");
-	TC_LOG_INFO("server.worldserver", "xx * Options de depart: lvl & lieu de départ dans sa faction      NPC 15000386    xx");
-	TC_LOG_INFO("server.worldserver", "xx * Guilde par defaut a la création d'un perso                                   xx");
-	TC_LOG_INFO("server.worldserver", "xx * FunRate (joueur) stat,heal,dps,temps de cast,power...                        xx");
-	TC_LOG_INFO("server.worldserver", "xx * DressNPC (creature_template_outfits , modelid1 a modelid4 en négatif)        xx");
-	TC_LOG_INFO("server.worldserver", "xx * NPC_AI_xxx Script de classes et autres pour mobs classiques                  xx");
-	TC_LOG_INFO("server.worldserver", "xx * Action suite a un événement Joueur(Apprentissage, connexion, levelup, zone...xx");
-	TC_LOG_INFO("server.worldserver", "xx                                                                                xx");
-	TC_LOG_INFO("server.worldserver", "xx * Diverse majs & debugs                                                        xx");
-	TC_LOG_INFO("server.worldserver", "xx * Un grand Merci a Noc & Scade pour leurs aides                                xx");
+    TC_LOG_INFO("server.worldserver", "xx  Derniere maj du core 06/2022 - Stitch                                         xx");
+    TC_LOG_INFO("server.worldserver", "xx                                                                                xx");
+    TC_LOG_INFO("server.worldserver", "xx * Toutes les Classes pour toutes les Races                                     xx");
+    TC_LOG_INFO("server.worldserver", "xx * Extension de classe Vampire pour le voleur                                   xx");
+    TC_LOG_INFO("server.worldserver", "xx * Extension de classe posture Chaos pour le DK                                 xx");
+    TC_LOG_INFO("server.worldserver", "xx * Rez sur le lieu de sa mort ou tp pdf                                         xx");
+    TC_LOG_INFO("server.worldserver", "xx * Solocraft perso adapte les stats aux instances suivant le nbr de joueurs     xx");
+    TC_LOG_INFO("server.worldserver", "xx * Pandaren : choix de la faction (quete & pnj change faction)                  xx");
+    TC_LOG_INFO("server.worldserver", "xx * PNJ change race,faction,apparence,panda                      NPC 15000142    xx");
+    TC_LOG_INFO("server.worldserver", "xx * Pet Demo utilisent desormais energie plutot que le mana                      xx");
+    TC_LOG_INFO("server.worldserver", "xx * Pet & FakePlayers donnent de l'XP et sont plus efficace                      xx");
+    TC_LOG_INFO("server.worldserver", "xx * Options de depart: lvl & lieu de dï¿½part dans sa faction      NPC 15000386    xx");
+    TC_LOG_INFO("server.worldserver", "xx * Guilde par defaut a la crï¿½ation d'un perso                                   xx");
+    TC_LOG_INFO("server.worldserver", "xx * FunRate (joueur) stat,heal,dps,temps de cast,power...                        xx");
+    TC_LOG_INFO("server.worldserver", "xx * DressNPC (creature_template_outfits , modelid1 a modelid4 en nï¿½gatif)        xx");
+    TC_LOG_INFO("server.worldserver", "xx * NPC_AI_xxx Script de classes et autres pour mobs classiques                  xx");
+    TC_LOG_INFO("server.worldserver", "xx * Action suite a un ï¿½vï¿½nement Joueur(Apprentissage, connexion, levelup, zone...xx");
+    TC_LOG_INFO("server.worldserver", "xx                                                                                xx");
+    TC_LOG_INFO("server.worldserver", "xx * Diverse majs & debugs                                                        xx");
+    TC_LOG_INFO("server.worldserver", "xx * Un grand Merci a Noc & Scade pour leurs aides                                xx");
     TC_LOG_INFO("server.worldserver", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
     TC_LOG_INFO("server.worldserver", " ");
     TC_LOG_INFO("server.worldserver", "Base sur le core Trinity 624 http://TrinityCore.org");
@@ -172,6 +188,8 @@ extern int main(int argc, char** argv)
     TC_LOG_INFO("server.worldserver", "Using Boost version: %i.%i.%i", BOOST_VERSION / 100000, BOOST_VERSION / 100 % 1000, BOOST_VERSION % 100);
 
     OpenSSLCrypto::threadsSetup(boost::dll::program_location().remove_filename());
+
+    std::shared_ptr<void> opensslHandle(nullptr, [](void*) { OpenSSLCrypto::threadsCleanup(); });
 
     // Seed the OpenSSL's PRNG here.
     // That way it won't auto-seed when calling BigNumber::SetRand and slow down the first world login
@@ -191,7 +209,7 @@ extern int main(int argc, char** argv)
         }
     }
 
-    // Set signal handlers (this must be done before starting io_service threads, because otherwise they would unblock and exit)
+    // Set signal handlers (this must be done before starting IoContext threads, because otherwise they would unblock and exit)
     boost::asio::signal_set signals(*ioContext, SIGINT, SIGTERM);
 #if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
     signals.add(SIGBREAK);
@@ -201,13 +219,13 @@ extern int main(int argc, char** argv)
     // Start the Boost based thread pool
     int numThreads = sConfigMgr->GetIntDefault("ThreadPool", 1);
     std::shared_ptr<std::vector<std::thread>> threadPool(new std::vector<std::thread>(), [ioContext](std::vector<std::thread>* del)
-    {
-        ioContext->stop();
-        for (std::thread& thr : *del)
-            thr.join();
+        {
+            ioContext->stop();
+            for (std::thread& thr : *del)
+                thr.join();
 
-        delete del;
-    });
+            delete del;
+        });
 
     if (numThreads < 1)
         numThreads = 1;
@@ -215,61 +233,80 @@ extern int main(int argc, char** argv)
     for (int i = 0; i < numThreads; ++i)
         threadPool->push_back(std::thread([ioContext]() { ioContext->run(); }));
 
-
     // Set process priority according to configuration settings
     SetProcessPriority("server.worldserver");
 
     // Start the databases
     if (!StartDB())
-    {
         return 1;
-    }
+
+    if (vm.count("update-databases-only"))
+        return 0;
+
+    std::shared_ptr<void> dbHandle(nullptr, [](void*) { StopDB(); });
 
     // Set server offline (not connectable)
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realm.Id.Realm);
 
     sRealmList->Initialize(*ioContext, sConfigMgr->GetIntDefault("RealmsStateUpdateDelay", 10));
 
+    std::shared_ptr<void> sRealmListHandle(nullptr, [](void*) { sRealmList->Close(); });
+
     LoadRealmInfo();
 
     sMetric->Initialize(realm.Name, *ioContext, []()
-    {
-        TC_METRIC_VALUE("online_players", sWorld->GetPlayerCount());
-    });
+        {
+            TC_METRIC_VALUE("online_players", sWorld->GetPlayerCount());
+        });
 
     TC_METRIC_EVENT("events", "Worldserver started", "");
 
-    // Initialize the World
+    std::shared_ptr<void> sMetricHandle(nullptr, [](void*)
+        {
+            TC_METRIC_EVENT("events", "Worldserver shutdown", "");
+            sMetric->ForceSend();
+        });
+
     sScriptMgr->SetScriptLoader(AddScripts);
+    std::shared_ptr<void> sScriptMgrHandle(nullptr, [](void*)
+        {
+            sScriptMgr->Unload();
+            sScriptReloadMgr->Unload();
+        });
+
+    // Initialize the World
     sWorld->SetInitialWorldSettings();
 
-    // Launch CliRunnable thread
-    std::thread* cliThread = nullptr;
-#ifdef _WIN32
-//Stitch console activé
-   if (sConfigMgr->GetBoolDefault("Console.Enable", true) && (m_ServiceStatus == -1)/* need disable console in service mode*/)
+    std::shared_ptr<void> mapManagementHandle(nullptr, [](void*)
+        {
+            // unload battleground templates before different singletons destroyed
+            sBattlegroundMgr->DeleteAllBattlegrounds();
 
-#else
-    if (sConfigMgr->GetBoolDefault("Console.Enable", true))
-#endif
-    {
-        cliThread = new std::thread(CliThread);
-    }
+            sInstanceSaveMgr->Unload();
+            sOutdoorPvPMgr->Die();                    // unload it before MapManager
+            sMapMgr->UnloadAll();                     // unload all grids (including locked in memory)
+        });
 
     // Start the Remote Access port (acceptor) if enabled
-    AsyncAcceptor* raAcceptor = nullptr;
+    std::unique_ptr<AsyncAcceptor> raAcceptor;
     if (sConfigMgr->GetBoolDefault("Ra.Enable", false))
-        raAcceptor = StartRaSocketAcceptor(*ioContext);
+        raAcceptor.reset(StartRaSocketAcceptor(*ioContext));
 
     // Start soap serving thread if enabled
-    std::thread* soapThread = nullptr;
+    std::shared_ptr<std::thread> soapThread;
     if (sConfigMgr->GetBoolDefault("SOAP.Enabled", false))
     {
-        soapThread = new std::thread(TCSoapThread, sConfigMgr->GetStringDefault("SOAP.IP", "127.0.0.1"), uint16(sConfigMgr->GetIntDefault("SOAP.Port", 7878)));
+        soapThread.reset(new std::thread(TCSoapThread, sConfigMgr->GetStringDefault("SOAP.IP", "127.0.0.1"), uint16(sConfigMgr->GetIntDefault("SOAP.Port", 7878))),
+            [](std::thread* thr)
+            {
+                thr->join();
+                delete thr;
+            });
     }
 
     // Launch the worldserver listener socket
     uint16 worldPort = uint16(sWorld->getIntConfig(CONFIG_PORT_WORLD));
+    uint16 instancePort = uint16(sWorld->getIntConfig(CONFIG_PORT_INSTANCE));
     std::string worldListener = sConfigMgr->GetStringDefault("BindIP", "0.0.0.0");
 
     int networkThreads = sConfigMgr->GetIntDefault("Network.Threads", 1);
@@ -277,16 +314,52 @@ extern int main(int argc, char** argv)
     if (networkThreads <= 0)
     {
         TC_LOG_ERROR("server.worldserver", "Network.Threads must be greater than 0");
-        return false;
+        return 1;
     }
 
-    sWorldSocketMgr.StartNetwork(*ioContext, worldListener, worldPort, networkThreads);
+    if (!sWorldSocketMgr.StartWorldNetwork(*ioContext, worldListener, worldPort, instancePort, networkThreads))
+    {
+        TC_LOG_ERROR("server.worldserver", "Failed to initialize network");
+        return 1;
+    }
+
+    std::shared_ptr<void> sWorldSocketMgrHandle(nullptr, [](void*)
+        {
+            sWorld->KickAll();                                       // save and kick all players
+            sWorld->UpdateSessions(1);                             // real players unload required UpdateSessions call
+
+            sWorldSocketMgr.StopNetwork();
+
+            ///- Clean database before leaving
+            ClearOnlineAccounts();
+        });
+
+    // Launch CliRunnable thread
+    std::shared_ptr<std::thread> cliThread;
+#ifdef _WIN32
+    if (sConfigMgr->GetBoolDefault("Console.Enable", true) && (m_ServiceStatus == -1)/* need disable console in service mode*/)
+#else
+    if (sConfigMgr->GetBoolDefault("Console.Enable", true))
+#endif
+    {
+        cliThread.reset(new std::thread(CliThread), &ShutdownCLIThread);
+    }
 
     // Set server online (allow connecting now)
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag & ~%u, population = 0 WHERE id = '%u'", REALM_FLAG_OFFLINE, realm.Id.Realm);
     realm.PopulationLevel = 0.0f;
     realm.Flags = RealmFlags(realm.Flags & ~uint32(REALM_FLAG_OFFLINE));
 
+    // Start the freeze check callback cycle in 5 seconds (cycle itself is 1 sec)
+    std::shared_ptr<FreezeDetector> freezeDetector;
+    if (int coreStuckTime = sConfigMgr->GetIntDefault("MaxCoreStuckTime", 0))
+    {
+        freezeDetector = std::make_shared<FreezeDetector>(*ioContext, coreStuckTime * 1000);
+        FreezeDetector::Start(freezeDetector);
+        TC_LOG_INFO("server.worldserver", "Starting up anti-freeze thread (%u seconds max stuck time)...", coreStuckTime);
+    }
+
+    TC_LOG_INFO("server.worldserver", "BfaCore Reforged | bfacore.reforged@gmail.com");
     TC_LOG_INFO("server.worldserver", "%s (worldserver-daemon) ready...", GitRevision::GetFullVersion());
 
     sScriptMgr->OnStartup();
@@ -300,48 +373,10 @@ extern int main(int argc, char** argv)
 
     sScriptMgr->OnShutdown();
 
-    sWorld->KickAll();                                       // save and kick all players
-    sWorld->UpdateSessions(1);                             // real players unload required UpdateSessions call
-
-    // unload battleground templates before different singletons destroyed
-    sBattlegroundMgr->DeleteAllBattlegrounds();
-
-    sWorldSocketMgr.StopNetwork();
-
-    sInstanceSaveMgr->Unload();
-    sOutdoorPvPMgr->Die();                    // unload it before MapManager
-    sMapMgr->UnloadAll();                     // unload all grids (including locked in memory)
-    sScriptMgr->Unload();
-    sScriptReloadMgr->Unload();
-
     // set server offline
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realm.Id.Realm);
-    sRealmList->Close();
-
-    // Clean up threads if any
-    if (soapThread != nullptr)
-    {
-        soapThread->join();
-        delete soapThread;
-    }
-
-    delete raAcceptor;
-
-    ///- Clean database before leaving
-    ClearOnlineAccounts();
-
-    StopDB();
-
-    TC_METRIC_EVENT("events", "Worldserver shutdown", "");
-    sMetric->ForceSend();
 
     TC_LOG_INFO("server.worldserver", "Halting process...");
-
-    ShutdownCLIThread(cliThread);
-
-    OpenSSLCrypto::threadsCleanup();
-
-    google::protobuf::ShutdownProtobufLibrary();
 
     // 0 - normal shutdown
     // 1 - shutdown at error
@@ -360,49 +395,54 @@ void ShutdownCLIThread(std::thread* cliThread)
         {
             // if CancelSynchronousIo() fails, print the error and try with old way
             DWORD errorCode = GetLastError();
-            LPCSTR errorBuffer;
 
-            DWORD formatReturnCode = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS,
-                                                   nullptr, errorCode, 0, (LPTSTR)&errorBuffer, 0, nullptr);
-            if (!formatReturnCode)
-                errorBuffer = "Unknown error";
+            // if CancelSynchronousIo fails with ERROR_NOT_FOUND then there was nothing to cancel, proceed with shutdown
+            if (errorCode != ERROR_NOT_FOUND)
+            {
+                LPSTR errorBuffer;
+                DWORD numCharsWritten = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS,
+                    nullptr, errorCode, 0, (LPTSTR)&errorBuffer, 0, nullptr);
+                if (!numCharsWritten)
+                    errorBuffer == "Unknown error";
 
-            TC_LOG_DEBUG("server.worldserver", "Error cancelling I/O of CliThread, error code %u, detail: %s",
-                uint32(errorCode), errorBuffer);
-            LocalFree((LPSTR)errorBuffer);
+                TC_LOG_DEBUG("server.worldserver", "Error cancelling I/O of CliThread, error code %u, detail: %s", uint32(errorCode), errorBuffer);
 
-            // send keyboard input to safely unblock the CLI thread
-            INPUT_RECORD b[4];
-            HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
-            b[0].EventType = KEY_EVENT;
-            b[0].Event.KeyEvent.bKeyDown = TRUE;
-            b[0].Event.KeyEvent.uChar.AsciiChar = 'X';
-            b[0].Event.KeyEvent.wVirtualKeyCode = 'X';
-            b[0].Event.KeyEvent.wRepeatCount = 1;
+                if (numCharsWritten)
+                    LocalFree(errorBuffer);
 
-            b[1].EventType = KEY_EVENT;
-            b[1].Event.KeyEvent.bKeyDown = FALSE;
-            b[1].Event.KeyEvent.uChar.AsciiChar = 'X';
-            b[1].Event.KeyEvent.wVirtualKeyCode = 'X';
-            b[1].Event.KeyEvent.wRepeatCount = 1;
+                // send keyboard input to safely unblock the CLI thread
+                INPUT_RECORD b[4];
+                HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+                b[0].EventType = KEY_EVENT;
+                b[0].Event.KeyEvent.bKeyDown = TRUE;
+                b[0].Event.KeyEvent.uChar.AsciiChar = 'X';
+                b[0].Event.KeyEvent.wVirtualKeyCode = 'X';
+                b[0].Event.KeyEvent.wRepeatCount = 1;
 
-            b[2].EventType = KEY_EVENT;
-            b[2].Event.KeyEvent.bKeyDown = TRUE;
-            b[2].Event.KeyEvent.dwControlKeyState = 0;
-            b[2].Event.KeyEvent.uChar.AsciiChar = '\r';
-            b[2].Event.KeyEvent.wVirtualKeyCode = VK_RETURN;
-            b[2].Event.KeyEvent.wRepeatCount = 1;
-            b[2].Event.KeyEvent.wVirtualScanCode = 0x1c;
+                b[1].EventType = KEY_EVENT;
+                b[1].Event.KeyEvent.bKeyDown = FALSE;
+                b[1].Event.KeyEvent.uChar.AsciiChar = 'X';
+                b[1].Event.KeyEvent.wVirtualKeyCode = 'X';
+                b[1].Event.KeyEvent.wRepeatCount = 1;
 
-            b[3].EventType = KEY_EVENT;
-            b[3].Event.KeyEvent.bKeyDown = FALSE;
-            b[3].Event.KeyEvent.dwControlKeyState = 0;
-            b[3].Event.KeyEvent.uChar.AsciiChar = '\r';
-            b[3].Event.KeyEvent.wVirtualKeyCode = VK_RETURN;
-            b[3].Event.KeyEvent.wVirtualScanCode = 0x1c;
-            b[3].Event.KeyEvent.wRepeatCount = 1;
-            DWORD numb;
-            WriteConsoleInput(hStdIn, b, 4, &numb);
+                b[2].EventType = KEY_EVENT;
+                b[2].Event.KeyEvent.bKeyDown = TRUE;
+                b[2].Event.KeyEvent.dwControlKeyState = 0;
+                b[2].Event.KeyEvent.uChar.AsciiChar = '\r';
+                b[2].Event.KeyEvent.wVirtualKeyCode = VK_RETURN;
+                b[2].Event.KeyEvent.wRepeatCount = 1;
+                b[2].Event.KeyEvent.wVirtualScanCode = 0x1c;
+
+                b[3].EventType = KEY_EVENT;
+                b[3].Event.KeyEvent.bKeyDown = FALSE;
+                b[3].Event.KeyEvent.dwControlKeyState = 0;
+                b[3].Event.KeyEvent.uChar.AsciiChar = '\r';
+                b[3].Event.KeyEvent.wVirtualKeyCode = VK_RETURN;
+                b[3].Event.KeyEvent.wVirtualScanCode = 0x1c;
+                b[3].Event.KeyEvent.wRepeatCount = 1;
+                DWORD numb;
+                WriteConsoleInput(hStdIn, b, 4, &numb);
+            }
         }
 #endif
         cliThread->join();
@@ -415,8 +455,6 @@ void WorldUpdateLoop()
     uint32 realCurrTime = 0;
     uint32 realPrevTime = getMSTime();
 
-    uint32 prevSleepTime = 0;                               // used for balanced full tick time length near WORLD_SLEEP_CONST
-
     ///- While we have not World::m_stopEvent, update the world
     while (!World::IsStopped())
     {
@@ -428,18 +466,11 @@ void WorldUpdateLoop()
         sWorld->Update(diff);
         realPrevTime = realCurrTime;
 
-        // diff (D0) include time of previous sleep (d0) + tick time (t0)
-        // we want that next d1 + t1 == WORLD_SLEEP_CONST
-        // we can't know next t1 and then can use (t0 + d1) == WORLD_SLEEP_CONST requirement
-        // d1 = WORLD_SLEEP_CONST - t0 = WORLD_SLEEP_CONST - (D0 - d0) = WORLD_SLEEP_CONST + d0 - D0
-        if (diff <= WORLD_SLEEP_CONST + prevSleepTime)
-        {
-            prevSleepTime = WORLD_SLEEP_CONST + prevSleepTime - diff;
+        uint32 executionTimeDiff = getMSTimeDiff(realCurrTime, getMSTime());
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(prevSleepTime));
-        }
-        else
-            prevSleepTime = 0;
+        // we know exactly how long it took to update the world, if the update took less than WORLD_SLEEP_CONST, sleep for WORLD_SLEEP_CONST - world update time
+        if (executionTimeDiff < WORLD_SLEEP_CONST)
+            std::this_thread::sleep_for(std::chrono::milliseconds(WORLD_SLEEP_CONST - executionTimeDiff));
 
 #ifdef _WIN32
         if (m_ServiceStatus == 0)
@@ -451,10 +482,37 @@ void WorldUpdateLoop()
     }
 }
 
-void SignalHandler(const boost::system::error_code& error, int /*signalNumber*/)
+void SignalHandler(boost::system::error_code const& error, int /*signalNumber*/)
 {
     if (!error)
         World::StopNow(SHUTDOWN_EXIT_CODE);
+}
+
+void FreezeDetector::Handler(std::weak_ptr<FreezeDetector> freezeDetectorRef, boost::system::error_code const& error)
+{
+    if (!error)
+    {
+        if (std::shared_ptr<FreezeDetector> freezeDetector = freezeDetectorRef.lock())
+        {
+            uint32 curtime = getMSTime();
+
+            uint32 worldLoopCounter = World::m_worldLoopCounter;
+            if (freezeDetector->_worldLoopCounter != worldLoopCounter)
+            {
+                freezeDetector->_lastChangeMsTime = curtime;
+                freezeDetector->_worldLoopCounter = worldLoopCounter;
+            }
+            // possible freeze
+            else if (getMSTimeDiff(freezeDetector->_lastChangeMsTime, curtime) > freezeDetector->_maxCoreStuckTimeInMs)
+            {
+                TC_LOG_ERROR("server.worldserver", "World Thread hangs, kicking out server!");
+                ABORT();
+            }
+
+            freezeDetector->_timer.expires_from_now(Seconds(1));
+            freezeDetector->_timer.async_wait(std::bind(&FreezeDetector::Handler, freezeDetectorRef, std::placeholders::_1));
+        }
+    }
 }
 
 AsyncAcceptor* StartRaSocketAcceptor(Trinity::Asio::IoContext& ioContext)
@@ -463,6 +521,13 @@ AsyncAcceptor* StartRaSocketAcceptor(Trinity::Asio::IoContext& ioContext)
     std::string raListener = sConfigMgr->GetStringDefault("Ra.IP", "0.0.0.0");
 
     AsyncAcceptor* acceptor = new AsyncAcceptor(ioContext, raListener, raPort);
+    if (!acceptor->Bind())
+    {
+        TC_LOG_ERROR("server.worldserver", "Failed to bind RA socket acceptor");
+        delete acceptor;
+        return nullptr;
+    }
+
     acceptor->AsyncAccept<RASession>();
     return acceptor;
 }
@@ -562,7 +627,8 @@ variables_map GetConsoleArguments(int argc, char** argv, fs::path& configFile, s
         ("help,h", "print usage message")
         ("version,v", "print version build info")
         ("config,c", value<fs::path>(&configFile)->default_value(fs::absolute(_TRINITY_CORE_CONFIG)),
-                     "use <arg> as configuration file")
+            "use <arg> as configuration file")
+        ("update-databases-only,u", "updates databases only")
         ;
 #ifdef _WIN32
     options_description win("Windows platform specific options");

@@ -15,26 +15,33 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
-* @file main.cpp
-* @brief Authentication Server main program
-*
-* This file contains the main program for the
-* authentication server
-*/
+ /**
+ * @file main.cpp
+ * @brief Authentication Server main program
+ *
+ * This file contains the main program for the
+ * authentication server
+ */
 
-#include "SessionManager.h"
 #include "AppenderDB.h"
+#include "BigNumber.h"
+#include "Config.h"
+#include "DatabaseEnv.h"
+#include "DatabaseLoader.h"
+#include "DeadlineTimer.h"
+#include "LoginRESTService.h"
+#include "MySQLThreading.h"
 #include "ProcessPriority.h"
 #include "RealmList.h"
-#include "GitRevision.h"
+#include "SessionManager.h"
 #include "SslContext.h"
-#include "DatabaseLoader.h"
-#include "LoginRESTService.h"
-#include <iostream>
+#include "Util.h"
+#include <boost/asio/signal_set.hpp>
 #include <boost/program_options.hpp>
-#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <google/protobuf/stubs/common.h>
+#include <iostream>
+#include <csignal>
 
 using boost::asio::ip::tcp;
 using namespace boost::program_options;
@@ -44,9 +51,9 @@ namespace fs = boost::filesystem;
 # define _TRINITY_BNET_CONFIG  "bnetserver.conf"
 #endif
 
-#if PLATFORM == PLATFORM_WINDOWS
+#if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
 #include "ServiceWin32.h"
-#include <boost/asio/signal_set.hpp>
+#include <GitRevision.h>
 char serviceName[] = "bnetserver";
 char serviceLongName[] = "TrinityCore bnet service";
 char serviceDescription[] = "TrinityCore Battle.net emulator authentication service";
@@ -58,7 +65,6 @@ char serviceDescription[] = "TrinityCore Battle.net emulator authentication serv
 */
 int m_ServiceStatus = -1;
 
-static boost::asio::deadline_timer* _serviceStatusWatchTimer;
 void ServiceStatusWatcher(std::weak_ptr<Trinity::Asio::DeadlineTimer> serviceStatusWatchTimerRef, std::weak_ptr<Trinity::Asio::IoContext> ioContextRef, boost::system::error_code const& error);
 #endif
 
@@ -68,7 +74,6 @@ void SignalHandler(std::weak_ptr<Trinity::Asio::IoContext> ioContextRef, boost::
 void KeepDatabaseAliveHandler(std::weak_ptr<Trinity::Asio::DeadlineTimer> dbPingTimerRef, int32 dbPingInterval, boost::system::error_code const& error);
 void BanExpiryHandler(std::weak_ptr<Trinity::Asio::DeadlineTimer> banExpiryCheckTimerRef, int32 banExpiryCheckInterval, boost::system::error_code const& error);
 variables_map GetConsoleArguments(int argc, char** argv, fs::path& configFile, std::string& configService);
-
 
 int main(int argc, char** argv)
 {
@@ -83,7 +88,9 @@ int main(int argc, char** argv)
 
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-#if PLATFORM == PLATFORM_WINDOWS
+    std::shared_ptr<void> protobufHandle(nullptr, [](void*) { google::protobuf::ShutdownProtobufLibrary(); });
+
+#if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
     if (configService.compare("install") == 0)
         return WinServiceInstall() ? 0 : 1;
     else if (configService.compare("uninstall") == 0)
@@ -94,8 +101,8 @@ int main(int argc, char** argv)
 
     std::string configError;
     if (!sConfigMgr->LoadInitial(configFile.generic_string(),
-                                 std::vector<std::string>(argv, argv + argc),
-                                 configError))
+        std::vector<std::string>(argv, argv + argc),
+        configError))
     {
         printf("Error in config file: %s\n", configError.c_str());
         return 1;
@@ -103,12 +110,6 @@ int main(int argc, char** argv)
 
     sLog->RegisterAppender<AppenderDB>();
     sLog->Initialize(nullptr);
-
-    TC_LOG_INFO("server.bnetserver", "%s (bnetserver)", GitRevision::GetFullVersion());
-    TC_LOG_INFO("server.bnetserver", "<Ctrl-C> to stop.\n");
-    TC_LOG_INFO("server.bnetserver", "Using configuration file %s.", sConfigMgr->GetFilename().c_str());
-    TC_LOG_INFO("server.bnetserver", "Using SSL version: %s (library: %s)", OPENSSL_VERSION_TEXT, SSLeay_version(SSLEAY_VERSION));
-    TC_LOG_INFO("server.bnetserver", "Using Boost version: %i.%i.%i", BOOST_VERSION / 100000, BOOST_VERSION / 100 % 1000, BOOST_VERSION % 100);
 
     // Seed the OpenSSL's PRNG here.
     // That way it won't auto-seed when calling BigNumber::SetRand and slow down the first world login
@@ -137,34 +138,45 @@ int main(int argc, char** argv)
     // Initialize the database connection
     if (!StartDB())
         return 1;
+
+    std::shared_ptr<void> dbHandle(nullptr, [](void*) { StopDB(); });
+
     std::shared_ptr<Trinity::Asio::IoContext> ioContext = std::make_shared<Trinity::Asio::IoContext>();
+
     // Start the listening port (acceptor) for auth connections
     int32 bnport = sConfigMgr->GetIntDefault("BattlenetPort", 1119);
     if (bnport < 0 || bnport > 0xFFFF)
     {
         TC_LOG_ERROR("server.bnetserver", "Specified battle.net port (%d) out of allowed range (1-65535)", bnport);
-        StopDB();
-        ioContext.reset();
         return 1;
     }
 
     if (!sLoginService.Start(ioContext.get()))
     {
-        StopDB();
         TC_LOG_ERROR("server.bnetserver", "Failed to initialize login service");
         return 1;
     }
 
+    std::shared_ptr<void> sLoginServiceHandle(nullptr, [](void*) { sLoginService.Stop(); });
+
     // Get the list of realms for the server
     sRealmList->Initialize(*ioContext, sConfigMgr->GetIntDefault("RealmsStateUpdateDelay", 10));
 
+    std::shared_ptr<void> sRealmListHandle(nullptr, [](void*) { sRealmList->Close(); });
+
     std::string bindIp = sConfigMgr->GetStringDefault("BindIP", "0.0.0.0");
 
-    sSessionMgr.StartNetwork(*ioContext, bindIp, bnport);
+    if (!sSessionMgr.StartNetwork(*ioContext, bindIp, bnport))
+    {
+        TC_LOG_ERROR("server.bnetserver", "Failed to initialize network");
+        return 1;
+    }
+
+    std::shared_ptr<void> sSessionMgrHandle(nullptr, [](void*) { sSessionMgr.StopNetwork(); });
 
     // Set signal handlers
     boost::asio::signal_set signals(*ioContext, SIGINT, SIGTERM);
-#if PLATFORM == PLATFORM_WINDOWS
+#if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
     signals.add(SIGBREAK);
 #endif
     signals.async_wait(std::bind(&SignalHandler, std::weak_ptr<Trinity::Asio::IoContext>(ioContext), std::placeholders::_1, std::placeholders::_2));
@@ -173,57 +185,39 @@ int main(int argc, char** argv)
     SetProcessPriority("server.bnetserver");
 
     // Enabled a timed callback for handling the database keep alive ping
-    int32 _dbPingInterval = sConfigMgr->GetIntDefault("MaxPingTime", 30);
-    std::shared_ptr<Trinity::Asio::DeadlineTimer> _dbPingTimer = std::make_shared<Trinity::Asio::DeadlineTimer>(*ioContext);
-    _dbPingTimer->expires_from_now(std::chrono::minutes(_dbPingInterval));
-    _dbPingTimer->async_wait([timerRef = std::weak_ptr(_dbPingTimer), _dbPingInterval](boost::system::error_code const& error) mutable
-    {
-        KeepDatabaseAliveHandler(std::move(timerRef), _dbPingInterval, error);
-    });
+    int32 dbPingInterval = sConfigMgr->GetIntDefault("MaxPingTime", 30);
+    std::shared_ptr<Trinity::Asio::DeadlineTimer> dbPingTimer = std::make_shared<Trinity::Asio::DeadlineTimer>(*ioContext);
+    dbPingTimer->expires_from_now(Minutes(dbPingInterval));
+    dbPingTimer->async_wait(std::bind(&KeepDatabaseAliveHandler, std::weak_ptr<Trinity::Asio::DeadlineTimer>(dbPingTimer), dbPingInterval, std::placeholders::_1));
 
-     int32 _banExpiryCheckInterval = sConfigMgr->GetIntDefault("BanExpiryCheckInterval", 60);
-    std::shared_ptr<Trinity::Asio::DeadlineTimer> _banExpiryCheckTimer = std::make_shared<Trinity::Asio::DeadlineTimer>(*ioContext);
-    _banExpiryCheckTimer->expires_after(std::chrono::seconds(_banExpiryCheckInterval));
-    _banExpiryCheckTimer->async_wait([timerRef = std::weak_ptr(_banExpiryCheckTimer), _banExpiryCheckInterval](boost::system::error_code const& error) mutable
-     {
-        BanExpiryHandler(std::move(timerRef), _banExpiryCheckInterval, error);
-     });
+    int32 banExpiryCheckInterval = sConfigMgr->GetIntDefault("BanExpiryCheckInterval", 60);
+    std::shared_ptr<Trinity::Asio::DeadlineTimer> banExpiryCheckTimer = std::make_shared<Trinity::Asio::DeadlineTimer>(*ioContext);
+    banExpiryCheckTimer->expires_from_now(Seconds(banExpiryCheckInterval));
+    banExpiryCheckTimer->async_wait(std::bind(&BanExpiryHandler, std::weak_ptr<Trinity::Asio::DeadlineTimer>(banExpiryCheckTimer), banExpiryCheckInterval, std::placeholders::_1));
 
-#if PLATFORM == PLATFORM_WINDOWS
+#if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
     std::shared_ptr<Trinity::Asio::DeadlineTimer> serviceStatusWatchTimer;
     if (m_ServiceStatus != -1)
     {
         serviceStatusWatchTimer = std::make_shared<Trinity::Asio::DeadlineTimer>(*ioContext);
-        serviceStatusWatchTimer->expires_after(std::chrono::seconds(1));
-        serviceStatusWatchTimer->async_wait([timerRef = std::weak_ptr(serviceStatusWatchTimer), ioContextRef = std::weak_ptr(ioContext)](boost::system::error_code const& error) mutable
-        {
-            ServiceStatusWatcher(std::move(timerRef), std::move(ioContextRef), error);
-        });
+        serviceStatusWatchTimer->expires_from_now(Seconds(1));
+        serviceStatusWatchTimer->async_wait(std::bind(&ServiceStatusWatcher,
+            std::weak_ptr<Trinity::Asio::DeadlineTimer>(serviceStatusWatchTimer),
+            std::weak_ptr<Trinity::Asio::IoContext>(ioContext),
+            std::placeholders::_1));
     }
 #endif
 
     // Start the io service worker loop
     ioContext->run();
 
-    _banExpiryCheckTimer->cancel();
-    _dbPingTimer->cancel();
-
-    sLoginService.Stop();
-
-    sSessionMgr.StopNetwork();
-
-    sRealmList->Close();
-
-    // Close the Database Pool and library
-    StopDB();
+    banExpiryCheckTimer->cancel();
+    dbPingTimer->cancel();
 
     TC_LOG_INFO("server.bnetserver", "Halting process...");
 
     signals.cancel();
 
-    _banExpiryCheckTimer->cancel();
-    _dbPingTimer->cancel();
-    google::protobuf::ShutdownProtobufLibrary();
     return 0;
 }
 
@@ -268,11 +262,8 @@ void KeepDatabaseAliveHandler(std::weak_ptr<Trinity::Asio::DeadlineTimer> dbPing
             TC_LOG_INFO("server.bnetserver", "Ping MySQL to keep connection alive");
             LoginDatabase.KeepAlive();
 
-            dbPingTimer->expires_after(std::chrono::minutes(dbPingInterval));
-            dbPingTimer->async_wait([timerRef = std::move(dbPingTimerRef), dbPingInterval](boost::system::error_code const& error) mutable
-            {
-                    KeepDatabaseAliveHandler(std::move(timerRef), dbPingInterval, error);
-            });
+            dbPingTimer->expires_from_now(Minutes(dbPingInterval));
+            dbPingTimer->async_wait(std::bind(&KeepDatabaseAliveHandler, dbPingTimerRef, dbPingInterval, std::placeholders::_1));
         }
     }
 }
@@ -287,13 +278,13 @@ void BanExpiryHandler(std::weak_ptr<Trinity::Asio::DeadlineTimer> banExpiryCheck
             LoginDatabase.Execute(LoginDatabase.GetPreparedStatement(LOGIN_UPD_EXPIRED_ACCOUNT_BANS));
             //LoginDatabase.Execute(LoginDatabase.GetPreparedStatement(LOGIN_DEL_BNET_EXPIRED_ACCOUNT_BANNED));
 
-            banExpiryCheckTimer->expires_from_now(std::chrono::seconds(banExpiryCheckInterval));
+            banExpiryCheckTimer->expires_from_now(Seconds(banExpiryCheckInterval));
             banExpiryCheckTimer->async_wait(std::bind(&BanExpiryHandler, banExpiryCheckTimerRef, banExpiryCheckInterval, std::placeholders::_1));
         }
     }
 }
 
-#if PLATFORM == PLATFORM_WINDOWS
+#if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
 void ServiceStatusWatcher(std::weak_ptr<Trinity::Asio::DeadlineTimer> serviceStatusWatchTimerRef, std::weak_ptr<Trinity::Asio::IoContext> ioContextRef, boost::system::error_code const& error)
 {
     if (!error)
@@ -306,11 +297,8 @@ void ServiceStatusWatcher(std::weak_ptr<Trinity::Asio::DeadlineTimer> serviceSta
             }
             else if (std::shared_ptr<Trinity::Asio::DeadlineTimer> serviceStatusWatchTimer = serviceStatusWatchTimerRef.lock())
             {
-                serviceStatusWatchTimer->expires_after(std::chrono::seconds(1));
-                serviceStatusWatchTimer->async_wait([timerRef = std::move(serviceStatusWatchTimerRef), ioContextRef = std::move(ioContextRef)](boost::system::error_code const& error) mutable
-                    {
-                        ServiceStatusWatcher(std::move(timerRef), std::move(ioContextRef), error);
-                    });
+                serviceStatusWatchTimer->expires_from_now(Seconds(1));
+                serviceStatusWatchTimer->async_wait(std::bind(&ServiceStatusWatcher, serviceStatusWatchTimerRef, ioContext, std::placeholders::_1));
             }
         }
     }
@@ -326,9 +314,9 @@ variables_map GetConsoleArguments(int argc, char** argv, fs::path& configFile, s
         ("help,h", "print usage message")
         ("version,v", "print version build info")
         ("config,c", value<fs::path>(&configFile)->default_value(fs::absolute(_TRINITY_BNET_CONFIG)),
-                     "use <arg> as configuration file")
+            "use <arg> as configuration file")
         ;
-#if PLATFORM == PLATFORM_WINDOWS
+#if TRINITY_PLATFORM == TRINITY_PLATFORM_WINDOWS
     options_description win("Windows platform specific options");
     win.add_options()
         ("service,s", value<std::string>(&configService)->default_value(""), "Windows service options: [install | uninstall]")
