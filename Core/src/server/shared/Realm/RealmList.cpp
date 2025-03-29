@@ -18,6 +18,8 @@
 
 #include "RealmList.h"
 #include "BattlenetRpcErrorCodes.h"
+#include "BigNumber.h"
+#include "SHA256.h"
 #include "DatabaseEnv.h"
 #include "DeadlineTimer.h"
 #include "Errors.h"
@@ -34,8 +36,6 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <zlib.h>
 #include <shared_mutex>
-#include "SHA256.h"
-#include "BigNumber.h"
 
 RealmList::RealmList() : _updateInterval(0)
 {
@@ -58,6 +58,7 @@ void RealmList::Initialize(Trinity::Asio::IoContext& ioContext, uint32 updateInt
     _updateTimer = std::make_unique<Trinity::Asio::DeadlineTimer>(ioContext);
     _resolver = std::make_unique<Trinity::Asio::Resolver>(ioContext);
 
+    LoadBuildInfo();
     // Get the content of the realmlist table in the database
     UpdateRealms(boost::system::error_code());
 }
@@ -65,6 +66,30 @@ void RealmList::Initialize(Trinity::Asio::IoContext& ioContext, uint32 updateInt
 void RealmList::Close()
 {
     _updateTimer->cancel();
+}
+
+void RealmList::LoadBuildInfo()
+{
+    //                                                              0             1              2           3      4
+    if (QueryResult result = LoginDatabase.Query("SELECT majorVersion, minorVersion, bugfixVersion, hotfixVersion, build FROM build_info ORDER BY build ASC"))
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            _builds.emplace_back();
+            RealmBuildInfo& build = _builds.back();
+            build.MajorVersion = fields[0].GetUInt32();
+            build.MinorVersion = fields[1].GetUInt32();
+            build.BugfixVersion = fields[2].GetUInt32();
+            std::string hotfixVersion = fields[3].GetString();
+            if (hotfixVersion.length() < build.HotfixVersion.size())
+                std::copy(hotfixVersion.begin(), hotfixVersion.end(), build.HotfixVersion.begin());
+            else
+                std::fill(hotfixVersion.begin(), hotfixVersion.end(), '\0');
+            build.Build = fields[4].GetUInt32();
+
+        } while (result->NextRow());
+    }
 }
 
 void RealmList::UpdateRealm(Realm& realm, Battlenet::RealmHandle const& id, uint32 build, std::string const& name,
@@ -104,8 +129,7 @@ void RealmList::UpdateRealms(boost::system::error_code const& error)
     for (auto const& p : _realms)
         existingRealms[p.first] = p.second.Name;
 
-    _realms.clear();
-
+    std::unordered_set<std::string> newSubRegions;
     RealmMap newRealms;
 
     // Circle through results and add them to the realm map
@@ -115,8 +139,6 @@ void RealmList::UpdateRealms(boost::system::error_code const& error)
         {
             try
             {
-                boost::asio::ip::tcp::resolver::iterator end;
-
                 Field* fields = result->Fetch();
                 uint32 realmId = fields[0].GetUInt32();
                 std::string name = fields[1].GetString();
@@ -124,27 +146,24 @@ void RealmList::UpdateRealms(boost::system::error_code const& error)
                 std::string localAddressString = fields[3].GetString();
                 std::string localSubmaskString = fields[4].GetString();
 
-                boost::system::error_code ec;
                 Optional<boost::asio::ip::tcp::endpoint> externalAddress = _resolver->Resolve(boost::asio::ip::tcp::v4(), externalAddressString, "");
-                if (!externalAddress || ec)
+                if (!externalAddress)
                 {
-                    TC_LOG_ERROR("realmlist", "Could not resolve address %s for realm \"%s\" id %u", fields[2].GetString().c_str(), name.c_str(), realmId);
+                    TC_LOG_ERROR("realmlist", "Could not resolve address %s for realm \"%s\" id %u", externalAddressString.c_str(), name.c_str(), realmId);
                     continue;
                 }
-
 
                 Optional<boost::asio::ip::tcp::endpoint> localAddress = _resolver->Resolve(boost::asio::ip::tcp::v4(), localAddressString, "");
-                if (!localAddress || ec)
+                if (!localAddress)
                 {
-                    TC_LOG_ERROR("realmlist", "Could not resolve localAddress %s for realm \"%s\" id %u", fields[3].GetString().c_str(), name.c_str(), realmId);
+                    TC_LOG_ERROR("realmlist", "Could not resolve localAddress %s for realm \"%s\" id %u", localAddressString.c_str(), name.c_str(), realmId);
                     continue;
                 }
 
-
                 Optional<boost::asio::ip::tcp::endpoint> localSubmask = _resolver->Resolve(boost::asio::ip::tcp::v4(), localSubmaskString, "");
-                if (!localSubmask || ec)
+                if (!localSubmask)
                 {
-                    TC_LOG_ERROR("realmlist", "Could not resolve localSubnetMask %s for realm \"%s\" id %u", fields[4].GetString().c_str(), name.c_str(), realmId);
+                    TC_LOG_ERROR("realmlist", "Could not resolve localSubnetMask %s for realm \"%s\" id %u", localSubmaskString.c_str(), name.c_str(), realmId);
                     continue;
                 }
 
@@ -167,7 +186,7 @@ void RealmList::UpdateRealms(boost::system::error_code const& error)
                 UpdateRealm(newRealms[id], id, build, name, externalAddress->address(), localAddress->address(), localSubmask->address(), port, icon,
                     flag, timezone, (allowedSecurityLevel <= SEC_ADMINISTRATOR ? AccountTypes(allowedSecurityLevel) : SEC_ADMINISTRATOR), pop);
 
-                _subRegions.insert(Battlenet::RealmHandle{ region, battlegroup, 0 }.GetAddressString());
+                newSubRegions.insert(Battlenet::RealmHandle{ region, battlegroup, 0 }.GetAddressString());
 
                 if (!existingRealms.count(id))
                     TC_LOG_INFO("realmlist", "Added realm \"%s\" at %s:%u.", name.c_str(), externalAddressString.c_str(), port);
@@ -181,12 +200,18 @@ void RealmList::UpdateRealms(boost::system::error_code const& error)
                 TC_LOG_ERROR("realmlist", "Realmlist::UpdateRealms has thrown an exception: %s", ex.what());
                 ABORT();
             }
-        }
-        while (result->NextRow());
+        } while (result->NextRow());
     }
 
     for (auto itr = existingRealms.begin(); itr != existingRealms.end(); ++itr)
         TC_LOG_INFO("realmlist", "Removed realm \"%s\".", itr->second.c_str());
+
+    {
+        std::unique_lock<std::shared_mutex> lock(_realmsMutex);
+
+        _subRegions.swap(newSubRegions);
+        _realms.swap(newRealms);
+    }
 
     if (_updateInterval)
     {
@@ -197,54 +222,43 @@ void RealmList::UpdateRealms(boost::system::error_code const& error)
 
 Realm const* RealmList::GetRealm(Battlenet::RealmHandle const& id) const
 {
+    std::shared_lock<std::shared_mutex> lock(_realmsMutex);
     auto itr = _realms.find(id);
     if (itr != _realms.end())
         return &itr->second;
 
-    return NULL;
+    return nullptr;
 }
 
 RealmBuildInfo const* RealmList::GetBuildInfo(uint32 build) const
 {
-    // List of client builds for verbose version info in realmlist packet
-    static std::vector<RealmBuildInfo> const ClientBuilds =
-    {
-        { 21355, 6, 2, 4, ' ' },
-        { 20726, 6, 2, 3, ' ' },
-        { 20574, 6, 2, 2, 'a' },
-        { 20490, 6, 2, 2, 'a' },
-        { 15595, 4, 3, 4, ' ' },
-        { 14545, 4, 2, 2, ' ' },
-        { 13623, 4, 0, 6, 'a' },
-        { 13930, 3, 3, 5, 'a' },                                  // 3.3.5a China Mainland build
-        { 12340, 3, 3, 5, 'a' },
-        { 11723, 3, 3, 3, 'a' },
-        { 11403, 3, 3, 2, ' ' },
-        { 11159, 3, 3, 0, 'a' },
-        { 10505, 3, 2, 2, 'a' },
-        { 9947,  3, 1, 3, ' ' },
-        { 8606,  2, 4, 3, ' ' },
-        { 6141,  1, 12, 3, ' ' },
-        { 6005,  1, 12, 2, ' ' },
-        { 5875,  1, 12, 1, ' ' },
-    };
-
-    for (std::size_t i = 0; i < ClientBuilds.size(); ++i)
-        if (ClientBuilds[i].Build == build)
-            return &ClientBuilds[i];
+    for (RealmBuildInfo const& clientBuild : _builds)
+        if (clientBuild.Build == build)
+            return &clientBuild;
 
     return nullptr;
 }
 
+uint32 RealmList::GetMinorMajorBugfixVersionForBuild(uint32 build) const
+{
+    auto buildInfo = std::lower_bound(_builds.begin(), _builds.end(), build, [](RealmBuildInfo const& buildInfo, uint32 value)
+        {
+            return buildInfo.Build < value;
+        });
+    return buildInfo != _builds.end() ? (buildInfo->MajorVersion * 10000 + buildInfo->MinorVersion * 100 + buildInfo->BugfixVersion) : 0;
+}
+
 void RealmList::WriteSubRegions(bgs::protocol::game_utilities::v1::GetAllValuesForAttributeResponse* response) const
 {
-    for (std::string const& subRegion : GetSubRegions())
+    std::shared_lock<std::shared_mutex> lock(_realmsMutex);
+    for (std::string const& subRegion : _subRegions)
         response->add_attribute_value()->set_string_value(subRegion);
 }
 
 std::vector<uint8> RealmList::GetRealmEntryJSON(Battlenet::RealmHandle const& id, uint32 build) const
 {
     std::vector<uint8> compressed;
+    std::shared_lock<std::shared_mutex> lock(_realmsMutex);
     if (Realm const* realm = GetRealm(id))
     {
         if (!(realm->Flags & REALM_FLAG_OFFLINE) && realm->Build == build)
@@ -277,13 +291,15 @@ std::vector<uint8> RealmList::GetRealmEntryJSON(Battlenet::RealmHandle const& id
             realmEntry.set_cfgconfigsid(realm->GetConfigId());
             realmEntry.set_cfglanguagesid(1);
 
+            lock.unlock();
+
             std::string json = "JamJSONRealmEntry:" + JSON::Serialize(realmEntry);
 
-            uLong compressedLength = compressBound(json.length());
+            uLong compressedLength = compressBound(uLong(json.length()));
             compressed.resize(compressedLength + 4);
-            *reinterpret_cast<uint32*>(compressed.data()) = json.length() + 1;
+            *reinterpret_cast<uint32*>(compressed.data()) = uint32(json.length() + 1);
 
-            if (compress(compressed.data() + 4, &compressedLength, reinterpret_cast<uint8 const*>(json.c_str()), json.length() + 1) == Z_OK)
+            if (compress(compressed.data() + 4, &compressedLength, reinterpret_cast<uint8 const*>(json.c_str()), uLong(json.length() + 1)) == Z_OK)
                 compressed.resize(compressedLength + 4);
             else
                 compressed.clear();
@@ -296,54 +312,57 @@ std::vector<uint8> RealmList::GetRealmEntryJSON(Battlenet::RealmHandle const& id
 std::vector<uint8> RealmList::GetRealmList(uint32 build, std::string const& subRegion) const
 {
     JSON::RealmList::RealmListUpdates realmList;
-    for (auto const& realm : _realms)
     {
-        if (realm.second.Id.GetSubRegionAddress() != subRegion)
-            continue;
-
-        uint32 flag = realm.second.Flags;
-        if (realm.second.Build != build)
-            flag |= REALM_FLAG_VERSION_MISMATCH;
-
-        JSON::RealmList::RealmState* state = realmList.add_updates();
-        state->mutable_update()->set_wowrealmaddress(realm.second.Id.GetAddress());
-        state->mutable_update()->set_cfgtimezonesid(1);
-        state->mutable_update()->set_populationstate((realm.second.Flags & REALM_FLAG_OFFLINE) ? 0u : std::max(uint32(realm.second.PopulationLevel), 1u));
-        state->mutable_update()->set_cfgcategoriesid(realm.second.Timezone);
-
-        JSON::RealmList::ClientVersion* version = state->mutable_update()->mutable_version();
-        if (RealmBuildInfo const* buildInfo = GetBuildInfo(realm.second.Build))
+        std::shared_lock<std::shared_mutex> lock(_realmsMutex);
+        for (auto const& realm : _realms)
         {
-            version->set_versionmajor(buildInfo->MajorVersion);
-            version->set_versionminor(buildInfo->MinorVersion);
-            version->set_versionrevision(buildInfo->BugfixVersion);
-            version->set_versionbuild(buildInfo->Build);
-        }
-        else
-        {
-            version->set_versionmajor(6);
-            version->set_versionminor(2);
-            version->set_versionrevision(4);
-            version->set_versionbuild(realm.second.Build);
-        }
+            if (realm.second.Id.GetSubRegionAddress() != subRegion)
+                continue;
 
-        state->mutable_update()->set_cfgrealmsid(realm.second.Id.Realm);
-        state->mutable_update()->set_flags(flag);
-        state->mutable_update()->set_name(realm.second.Name);
-        state->mutable_update()->set_cfgconfigsid(realm.second.GetConfigId());
-        state->mutable_update()->set_cfglanguagesid(1);
+            uint32 flag = realm.second.Flags;
+            if (realm.second.Build != build)
+                flag |= REALM_FLAG_VERSION_MISMATCH;
 
-        state->set_deleting(false);
+            JSON::RealmList::RealmState* state = realmList.add_updates();
+            state->mutable_update()->set_wowrealmaddress(realm.second.Id.GetAddress());
+            state->mutable_update()->set_cfgtimezonesid(1);
+            state->mutable_update()->set_populationstate((realm.second.Flags & REALM_FLAG_OFFLINE) ? 0u : std::max(uint32(realm.second.PopulationLevel), 1u));
+            state->mutable_update()->set_cfgcategoriesid(realm.second.Timezone);
+
+            JSON::RealmList::ClientVersion* version = state->mutable_update()->mutable_version();
+            if (RealmBuildInfo const* buildInfo = GetBuildInfo(realm.second.Build))
+            {
+                version->set_versionmajor(buildInfo->MajorVersion);
+                version->set_versionminor(buildInfo->MinorVersion);
+                version->set_versionrevision(buildInfo->BugfixVersion);
+                version->set_versionbuild(buildInfo->Build);
+            }
+            else
+            {
+                version->set_versionmajor(6);
+                version->set_versionminor(2);
+                version->set_versionrevision(4);
+                version->set_versionbuild(realm.second.Build);
+            }
+
+            state->mutable_update()->set_cfgrealmsid(realm.second.Id.Realm);
+            state->mutable_update()->set_flags(flag);
+            state->mutable_update()->set_name(realm.second.Name);
+            state->mutable_update()->set_cfgconfigsid(realm.second.GetConfigId());
+            state->mutable_update()->set_cfglanguagesid(1);
+
+            state->set_deleting(false);
+        }
     }
 
     std::string json = "JSONRealmListUpdates:" + JSON::Serialize(realmList);
 
-    uLong compressedLength = compressBound(json.length());
+    uLong compressedLength = compressBound(uLong(json.length()));
     std::vector<uint8> compressed;
     compressed.resize(4 + compressedLength);
-    *reinterpret_cast<uint32*>(compressed.data()) = json.length() + 1;
+    *reinterpret_cast<uint32*>(compressed.data()) = uint32(json.length() + 1);
 
-    compress(compressed.data() + 4, &compressedLength, reinterpret_cast<uint8 const*>(json.c_str()), json.length() + 1);
+    compress(compressed.data() + 4, &compressedLength, reinterpret_cast<uint8 const*>(json.c_str()), uLong(json.length() + 1));
 
     compressed.resize(compressedLength + 4);
 
@@ -353,6 +372,7 @@ std::vector<uint8> RealmList::GetRealmList(uint32 build, std::string const& subR
 uint32 RealmList::JoinRealm(uint32 realmAddress, uint32 build, boost::asio::ip::address const& clientAddress, std::array<uint8, 32> const& clientSecret,
     LocaleConstant locale, std::string const& os, std::string accountName, bgs::protocol::game_utilities::v1::ClientResponse* response) const
 {
+    std::shared_lock<std::shared_mutex> lock(_realmsMutex);
     if (Realm const* realm = GetRealm(Battlenet::RealmHandle(realmAddress)))
     {
         if (realm->Flags & REALM_FLAG_OFFLINE || realm->Build != build)
@@ -366,14 +386,16 @@ uint32 RealmList::JoinRealm(uint32 realmAddress, uint32 build, boost::asio::ip::
         address->set_ip(realm->GetAddressForClient(clientAddress).to_string());
         address->set_port(realm->Port);
 
+        lock.unlock();
+
         std::string json = "JSONRealmListServerIPAddresses:" + JSON::Serialize(serverAddresses);
 
-        uLong compressedLength = compressBound(json.length());
+        uLong compressedLength = compressBound(uLong(json.length()));
         std::vector<uint8> compressed;
         compressed.resize(4 + compressedLength);
-        *reinterpret_cast<uint32*>(compressed.data()) = json.length() + 1;
+        *reinterpret_cast<uint32*>(compressed.data()) = uint32(json.length() + 1);
 
-        if (compress(compressed.data() + 4, &compressedLength, reinterpret_cast<uint8 const*>(json.c_str()), json.length() + 1) != Z_OK)
+        if (compress(compressed.data() + 4, &compressedLength, reinterpret_cast<uint8 const*>(json.c_str()), uLong(json.length() + 1)) != Z_OK)
             return ERROR_UTIL_SERVER_FAILED_TO_SERIALIZE_RESPONSE;
 
         BigNumber serverSecret;
