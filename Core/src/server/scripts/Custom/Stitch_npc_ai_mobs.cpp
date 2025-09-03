@@ -88,8 +88,8 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 
 			uint32 Random;
 			uint32 DistanceDeCast = 40;												// Distance max a laquelle un npc attaquera , au dela il quite le combat
-			uint32 ResteADistance = 5;	///////////											// Distance max a laquelle un npc s'approchera
-			uint32 Dist = 0;															// Distance entre le npc et sa cible
+			uint32 ResteADistance = 5;	///////////									// Distance max a laquelle un npc s'approchera
+			uint32 Dist = 0;														// Distance entre le npc et sa cible
 			Unit* victim = me->GetVictim();					
 			uint32 Crfamily = me->GetCreatureTemplate()->family;
 			uint32 ForceFamily = me->GetCreatureTemplate()->pickpocketLootId;
@@ -98,9 +98,10 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 			uint32 mapid = 0;
 			uint32 MessageAlagro = 0;
 			uint32 Spell_ContreAttaque = 0;
-			uint8 Spell_B_Non_Cumulable = 0;											// == 1 : Spell_B ne sera pas appliqué s'il est deja actif sur la cible . Par exemple pour Brise-genou
+			uint8 Spell_B_Non_Cumulable = 0;										// == 1 : Spell_B ne sera pas appliqué s'il est deja actif sur la cible . Par exemple pour Brise-genou
 			uint32 spell_Id = 0;
 			uint32 Spell_agro_Distant = 0;
+			uint32 Spell_Canalise_hc = me->m_spells[7];								// Pour spell canalisé hors combat
 
 			// Definitions des variables Cooldown et le 1er lancement
 			uint32 Cooldown_SpellA = 1000;											// Sort principal
@@ -127,6 +128,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 			uint32 Start_Agro2 = 0;
 			uint32 Cooldown_Spell_ContreAttaque = 4000;
 			uint32 Cooldown_Spell_ContreAttaque_defaut = 8000;
+			uint32 Cooldown_Spell_Canalise_hc = 5000;								// Pour spell canalisé hors combat
 
 			// Spells 
 			uint32 Spell_A = 0;
@@ -528,7 +530,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 			}
 			void Init_AI()
 			{
-				Spell_B_Non_Cumulable = 0;
+
 
 				// ################################################################################################################################################
 				// Tirages aléatoires des spells & cooldown
@@ -941,9 +943,9 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					case 42:
 					case 100:
 						me->SetMeleeDamageSchool(SpellSchools(0));									// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
-						Spell_B_Non_Cumulable = 0;
+						//Spell_B_Non_Cumulable = 1;
 						Spell_respawn_evade = 0;
-						Buf_A = 0;
+						//Buf_A = 0;
 						Spell_Heal = 0;
 						Cooldown_SpellA = 1000;
 						Cooldown_SpellA_defaut = Base_Cooldown_Cast_A;
@@ -1137,6 +1139,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 						// Tirage aléatoire de l'AI pour le mouvement en combat : ne marchait pas dans void Init_AI() 
 						// ################################################################################################################################################
 
+						if (ForceFamily > 300) { ForceFamily = 0; }
 						if (ForceFamily > 0 && ForceFamily < 301) { Crfamily = ForceFamily; }
 
 						// Tirage aléatoire des spells ----------------------------------------------------------------------------------------------------------------
@@ -1195,7 +1198,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 								Cooldown_Trop_Loin_Defaut = 6000;
 							}
 							break;
-						case 3:		// Araignee  -  CREATURE_FAMILY_SPIDER - AI : Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance , Doit avoir du mana , % Toile_Araignee)
+						case 3:		// Araignee  -  CREATURE_FAMILY_SPIDER - AI : Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance Cumulable, Doit avoir du mana , % Toile_Araignee)
 							me->SetMeleeDamageSchool(SpellSchools(3));															// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
 							Spell_B_Non_Cumulable = 0;
 							//Spell_respawn_evade = 0;
@@ -1554,7 +1557,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							break;
 						case 23:	//Imp  -  CREATURE_FAMILY_IMP - AI : Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance )
 							me->SetMeleeDamageSchool(SpellSchools(2));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
-							Spell_B_Non_Cumulable = 0;
+							Spell_B_Non_Cumulable = 1;
 							//Spell_respawn_evade = 0;
 							//Spell_Heal = 0;																// 
 							Cooldown_SpellA = 1000;
@@ -1575,6 +1578,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin_Defaut = 5000;
 							break;
 						case 24:	//Chauve souris  -  CREATURE_FAMILY_BAT - AI : Mouvement_Contact_Prudent_Volant
+							AI_Random = urand(1, 2); 
 							me->SetMeleeDamageSchool(SpellSchools(3));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
 							Spell_B_Non_Cumulable = 0;
 							//Spell_respawn_evade = 0;
@@ -1591,9 +1595,14 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Principal_B = 6000;
 							Cooldown_Principal_B_Defaut = urand(6000, 8000);
 							ResteADistance = 5;
-							Spell_Trop_Loin = 0;																			// 
+							Spell_Trop_Loin = Spell_Vitesse_4s;																			// 
 							Cooldown_Trop_Loin = urand(7000, 10000);
 							Cooldown_Trop_Loin_Defaut = urand(7000, 10000);
+							if (AI_Random == 1) 
+							{ 
+								Cooldown_Trop_Loin = 4000;
+								Cooldown_Trop_Loin_Defaut = 4000;
+							}
 							break;
 						case 25:	//Hyene  -  CREATURE_FAMILY_HYENA - AI : Mouvement_Contact_Prudent
 							me->SetMeleeDamageSchool(SpellSchools(0));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
@@ -1637,10 +1646,10 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin = urand(3000, 8000);
 							Cooldown_Trop_Loin_Defaut = urand(5000, 7000);
 							break;
-						case 27:	//Serpent des vents  -  CREATURE_FAMILY_WIND_SERPENT - AI : Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance, %Bouclier_De_Foudre )
+						case 27:	//Serpent des vents  -  CREATURE_FAMILY_WIND_SERPENT - AI : Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance  Non cumulable, %Bouclier_De_Foudre )
 							me->SetMeleeDamageSchool(SpellSchools(6));															// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
-							Spell_B_Non_Cumulable = 0;
-							if (Spell_respawn_evade == 0) { Spell_respawn_evade = Spell_Bouclier_De_Foudre; }	// spells[3] 
+							Spell_B_Non_Cumulable = 1;
+							Spell_respawn_evade = 0;
 							if (Spell_Heal == 0) { Spell_Heal = 974; }			                                // spells[5]	// bouclier de terre 974
 							Cooldown_SpellA = 1000;
 							Cooldown_SpellA_defaut = Base_Cooldown_Cast_A - 250;
@@ -1748,10 +1757,10 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin_Defaut = urand(8000, 15000);
 							AI_Random = urand(1, 4);
 							break;
-						case 34:	//Raie du Neant  -  CREATURE_FAMILY_NETHER_RAY - AI : 1/2_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance ) , 1/2_Mouvement_Caster
+						case 34:	//Raie du Neant  -  CREATURE_FAMILY_NETHER_RAY - AI : 1/2_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance Non cumulable) , 1/2_Mouvement_Caster
 							AI_Random = urand(1,2);
 							me->SetMeleeDamageSchool(SpellSchools(6));													// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
-							Spell_B_Non_Cumulable = 0;
+							Spell_B_Non_Cumulable = 1;
 							if (Spell_respawn_evade == 0) { Spell_respawn_evade = Spell_Vitesse_4s; }					// spells[3] 
 							//Spell_Heal = 0;
 							Cooldown_SpellA = 1000;
@@ -1842,9 +1851,9 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin = urand(3000, 8000);
 							Cooldown_Trop_Loin_Defaut = urand(8000, 15000);
 							break;
-						case 38:	//Chimere  -  CREATURE_FAMILY_CHIMAERA - AI : Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance, %Epines )
+						case 38:	//Chimere  -  CREATURE_FAMILY_CHIMAERA - AI : Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance Non cumulable, %Epines )
 							me->SetMeleeDamageSchool(SpellSchools(0));										// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
-							Spell_B_Non_Cumulable = 0;
+							Spell_B_Non_Cumulable = 1;
 							if (Spell_respawn_evade == 0) { Spell_respawn_evade = Spell_Epines; }			// spells[3] 
 							//Spell_Heal = 0;
 							Cooldown_SpellA = 500;
@@ -1939,7 +1948,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin_Defaut = urand(7000, 9000);
 							AI_Random = urand(1, 4);
 							break;
-						case 42:	//Ver  -  CREATURE_FAMILY_WORM - AI : Mouvement_Caster_Puis_Contact ( spell [2]=spell a distance 
+						case 42:	//Ver  -  CREATURE_FAMILY_WORM - AI : Mouvement_Caster_Puis_Contact ( spell [2]=spell a distance Cumulable 
 							me->SetMeleeDamageSchool(SpellSchools(0));										// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
 							Spell_B_Non_Cumulable = 0;
 							//Spell_respawn_evade = 0;
@@ -2042,7 +2051,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin = urand(7000, 8000);
 							Cooldown_Trop_Loin_Defaut = urand(6000, 8000);
 							break;
-						case 49:	//Elementaire d'eau  -  CREATURE_FAMILY_WATER_ELEMENTAL - AI : 1/3_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance ) , 1/3_Mouvement_Caster , 1/3_Mouvement_Contact_Basique
+						case 49:	//Elementaire d'eau  -  CREATURE_FAMILY_WATER_ELEMENTAL - AI : 1/3_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance Cumulable ) , 1/3_Mouvement_Caster , 1/3_Mouvement_Contact_Basique
 							AI_Random = urand(1,3);
 							me->SetMeleeDamageSchool(SpellSchools(4));										// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
 							Spell_B_Non_Cumulable = 0;
@@ -2260,7 +2269,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 								Cooldown_Principal_B_Defaut = urand(6000, 8000);
 							}
 							break;
-						case 100:	//Diablotin gangrene  -  CREATURE_FAMILY_FELIMP - AI : 1/2_Mouvement_Contact_Avance_Recule , 1/2_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance 
+						case 100:	//Diablotin gangrene  -  CREATURE_FAMILY_FELIMP - AI : 1/2_Mouvement_Contact_Avance_Recule , 1/2_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance Ccumulable)
 							AI_Random = urand(1, 2);
 							me->SetMeleeDamageSchool(SpellSchools(5));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
 							Spell_B_Non_Cumulable = 0;
@@ -2375,7 +2384,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin = urand(7000, 12000);
 							Cooldown_Trop_Loin_Defaut = urand(8000, 12000);
 							break;
-						case 116:	//elementaire de feu  -  CREATURE_FAMILY_FIREELEMENTAL - AI : 1/4_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance ) , 1/4_Mouvement_Caster , 2/4_Mouvement_Contact_Basique, %Armure_De_La_Fournaise
+						case 116:	//elementaire de feu  -  CREATURE_FAMILY_FIREELEMENTAL - AI : 1/4_Mouvement_Caster_Puis_Contact ( spell [2] = spell a distance Cumulable) , 1/4_Mouvement_Caster , 2/4_Mouvement_Contact_Basique, %Armure_De_La_Fournaise
 							AI_Random = urand(1, 4);
 							me->SetMeleeDamageSchool(SpellSchools(2));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
 							Spell_B_Non_Cumulable = 0;
@@ -2738,6 +2747,11 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Start_Agro2 = 1;
 							Family_Special_Retire_au_contact();
 						}
+
+						if (Crfamily == CREATURE_FAMILY_SE_DETERRE_AU_CONTACT && Dist > 3 && me->HasAura(Spell_No_ModelID))
+							me->CastSpell(me, 300285, true);
+
+
 					}
 
 					// ############################################################################################################################################
@@ -2765,9 +2779,10 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 						{
 							if (Cooldown_SpellB <= diff)
 							{
+
 								if (Dist <= DistanceDeCast /*ResteADistance*/)
 								{
-									if (Spell_B_Non_Cumulable == 0 || Spell_B_Non_Cumulable == 1 && !victim->HasAura(Spell_B) )
+									if (Spell_B_Non_Cumulable == 0 || (Spell_B_Non_Cumulable == 1 && !victim->HasAura(Spell_B)))
 									{
 										me->CastSpell(victim, Spell_B, true);
 
@@ -2891,7 +2906,12 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Mouvement_Caster_Puis_Contact(diff);
 							break;
 						case 24:	// Chauve souris - CREATURE_FAMILY_BAT
-							Mouvement_Contact_Prudent_Volant(diff);
+							if (AI_Random == 1)
+							{
+								Mouvement_Contact_Basique(diff);
+							}
+							else
+								Mouvement_Contact_Prudent_Volant(diff);
 							break;
 						case 25:	// Hyene - CREATURE_FAMILY_HYENA
 							Mouvement_Contact_Prudent(diff);
@@ -3122,8 +3142,18 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 
 				}
 
+
 				// ################################################################################################################################################
 				Mouvement_All();
+
+				if (Cooldown_Spell_Canalise_hc <= diff)
+				{
+					Spell_canalisé_hc_home();
+					Cooldown_Spell_Canalise_hc = urand(10000, 15000);
+				}
+				else Cooldown_Spell_Canalise_hc -= diff;
+
+
 			}
 
 
@@ -3153,6 +3183,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					if (Dist <= 5)
 					{
 						me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);						// UNROOT
+						me->SetWalk(false);																// Ne pas marcher
 
 						x = (victim->GetPositionX() + irand(0, ResteADistance * 2) - ResteADistance);
 						y = (victim->GetPositionY() + irand(0, ResteADistance * 2) - ResteADistance);
@@ -3424,17 +3455,17 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				{
 					if (Dist < 6)
 					{
-						Random = urand(1, 5);
+						Random = urand(1, 3);
 						if ((Random != 1) && Player_Caster() == false)
 						{
-							Tourne_Au_Tour_Aleatoire(urand(10, 12));											// 4 chances sur 5 pour s'eloigner si le joueur n'est pas un caster
+							Tourne_Au_Tour_Aleatoire(urand(10, 12));											// 2 chances sur 3 pour s'eloigner si le joueur n'est pas un caster
 							Cooldown_Principal_A = 3000;
 
 							//me->SetSpeedRate(MOVE_RUN, 1.02f);												// Vitesse de déplacement
 						}
 						else
 						{
-							Recule_ou_Avance(3);																// 1 chances sur 5 pour passe dans le dos de la cible
+							Recule_ou_Avance(3);																// 1 chances sur 3 pour passe dans le dos de la cible
 						}
 						
 						Cooldown_Principal_B = Cooldown_Principal_B_Defaut + ((urand(0, 2) * 1000));
@@ -3710,7 +3741,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					{
 						//DoCastAOE(Spell_Heal);
 						me->CastSpell(me, Spell_Heal, true);
-						Cooldown_Spell_Heal = Cooldown_Spell_Heal_defaut;
+						Cooldown_Spell_Heal = urand(7000,8000);
 					}
 				}
 				else Cooldown_Spell_Heal -= diff;
@@ -3795,8 +3826,8 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 
 			void Senterre()
 			{
-				if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() != IDLE_MOTION_TYPE)
-					return;
+				//if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() != IDLE_MOTION_TYPE)
+				//	return;
 				me->CastSpell(me, Spell_No_ModelID, true);										// Masque le ModelID
 				me->CastSpell(me, Spell_Senterre, true);										// Fumée et terre remuée Persistant
 				me->CastSpell(me, Spell_Sedeterre_sans_fumee, true);							// Pour visuel sedeterrer
@@ -3820,7 +3851,6 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				me->RemoveAurasDueToSpell(Spell_Senterre_sans_fumee);							// Retire fumée et terre remuée Temporaire
 				me->RemoveAurasDueToSpell(Spell_Sedeterre_sans_fumee);							// Visuel explosion de fumée
 				me->RemoveAurasDueToSpell(Spell_No_ModelID);									// Retire invisible
-				me->RemoveAurasDueToSpell(Camouflage_dans_lombre);
 				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);						// Selectionnable
 			}
 			void Se_DeterreSansFumee()
@@ -3828,7 +3858,6 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				me->RemoveAurasDueToSpell(Spell_Senterre_sans_fumee);							// Retire fumée et terre remuée Temporaire
 				me->RemoveAurasDueToSpell(Spell_Sedeterre_sans_fumee);							// Visuel explosion de fumée
 				me->RemoveAurasDueToSpell(Spell_No_ModelID);									// Retire invisible
-				me->RemoveAurasDueToSpell(Camouflage_dans_lombre);
 				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);						// Selectionnable
 			}
 			void Morph_Rocher()
@@ -3862,7 +3891,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				if (Crfamily == CREATURE_FAMILY_SCORPID  /*20*/ || Crfamily == CREATURE_FAMILY_WORM /*42*/)
 				{
 					Random = urand(1, 3);
-					if (Random != 1)
+					if (Random == 1)
 					{
 						Senterre_sans_fumee();
 					}
@@ -3883,7 +3912,12 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				// Custom 156
 				if (Crfamily == CREATURE_FAMILY_SE_DETERRE_AU_CONTACT /*156*/ && !me->HasUnitState(UNIT_STATE_MOVE))
 				{
-					Senterre_sans_fumee();
+					Random = urand(1, 3);
+					if (Random == 1)
+					{
+						Senterre_sans_fumee();
+					}
+
 				}
 
 				if (Crfamily == CREATURE_FAMILY_MORPH_ROCHER  /*157*/ && !me->HasUnitState(UNIT_STATE_MOVE))
@@ -3926,6 +3960,8 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				if (Crfamily == CREATURE_FAMILY_SE_DETERRE_AU_CONTACT /*156 && me->GetMotionMaster()->GetCurrentMovementGeneratorType() != IDLE_MOTION_TYPE*/)
 				{
 					Se_Deterre();
+					me->RemoveAurasDueToSpell(300285);									//
+
 				}
 			}
 
@@ -3986,6 +4022,11 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 
 			bool AuraLenteur()
 			{
+				if (me->HasAura(137573)		// vitesse (+70%/4s) , annule tous les effets affectant le déplacement
+					|| me->HasAura(31224)	// Cape d'ombre    
+					|| me->HasAura(1856)	// Disparition
+					) return false;
+
 				if (me->HasAura(116)		// Eclair_de_givre 116 
 					|| me->HasAura(71318)	// Eclair_de_givre 71318
 					|| me->HasAura(31589)	// Lenteur 31589
@@ -4003,6 +4044,8 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					|| me->HasAura(116095) 	// Handicap 116095
 					|| me->HasAura(300197) 	// Toucher_de_glace 300197
 					|| me->HasAura(20170)	// Sceau de justice 20170
+					|| me->HasAura(6343)	// Coup de tonnerre
+					|| me->HasAura(8147)	// Coup de tonnerre
 					) return true;
 				else return false;
 			}
@@ -4025,6 +4068,19 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					return true;
 					else return false;
 			}
+
+			void Spell_canalisé_hc_home()
+			{
+				// Sort canalisé hors combat, doit etre fixe et en home 
+				if (Spell_Canalise_hc > 1 && !me->IsInCombat() && !me->HasAura(Spell_Canalise_hc))
+				{
+					if (urand(1,2) == 1)
+						//me->CastSpell(me, Spell_Canalise_hc, true);
+						DoCast(me, Spell_Canalise_hc);
+				}
+			}
+
+
 		};    
 
 		

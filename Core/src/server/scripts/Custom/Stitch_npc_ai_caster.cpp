@@ -51,7 +51,7 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 			uint32 Npc_Model = me->GetDisplayId();
 			uint32 Random;
 			uint32 ForceClasse;
-			uint32 DistanceDeCast = 40;												// Distance max a laquelle un npc attaquera , au dela il quite le combat
+			uint32 DistanceDeCast = 40;												// Distance max a laquelle un npc attaquera , au dela il quite le combat,Est aussi utilisé pour la distance max de son home (DistanceDeCast+20)
 			uint32 ResteADistance = 15;												// Distance max a laquelle un npc s'approchera
 			uint32 Dist;															// Distance entre le npc et sa cible
 			Unit* victim = me->GetVictim();										 
@@ -62,8 +62,7 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 			uint32 Spell_ContreAttaque = 0;
 			uint32 Visuel_Teleportation = 87459;
 			uint32 Bond_aleatoire_25m = 300267;
-			//uint32 Spell_Canalise_hc = 0;					// Sort canalisé hors combat, doit etre fixe et en home
-			uint32 Spell_Canalise_hc = me->m_spells[7];
+			uint32 Spell_Canalise_hc = me->m_spells[7];								// Sort canalisé hors combat, doit etre fixe et en home
 			// Definitions des variables Cooldown et le 1er lancement
 			uint32 Cooldown_Spell1 = 1000;
 			uint32 Cooldown_Spell1_defaut = urand(3000, 3750);
@@ -81,6 +80,8 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 			uint32 Cooldown_RegenMana_defaut = 3500;
 			uint32 Cooldown_bond_aleatoire_25m = 3000;
 			uint32 Cooldown_bond_aleatoire_25m_Defaut = urand(6000, 8000);
+			uint32 Cooldown_Spell_Canalise_hc = 1000;
+			uint32 Cooldown_Spell_Canalise_hc_defaut = 3000;						// Sort canalisé hors combat
 
 			// Spells
 			uint32 Buf_1 = 0;													
@@ -287,6 +288,11 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 				{
 					ResteADistance = 7;
 				}
+
+				Cooldown_Spell_Canalise_hc_defaut = me->GetCurrentSpellCastTime(Spell_Canalise_hc)+urand(500,1500);
+				if (Cooldown_Spell_Canalise_hc_defaut < 2000)
+					Cooldown_Spell_Canalise_hc_defaut = 2000;
+
 				// ################################################################################################################################################
 
 
@@ -349,7 +355,6 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 			{
 				me->SetReactState(REACT_AGGRESSIVE);
 				//me->SetSpeedRate(MOVE_RUN, 1.01f);										// Vitesse par defaut définit a 1.01f puisque le patch modification par type,famille test si 1.0f
-				Spell_canalisé_hc_home();
 				Arme_rangé();
 			}
 			void UpdateAI(uint32 diff) override
@@ -456,6 +461,15 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 				}
 				// ################################################################################################################################################
 				Mouvement_All();
+
+				if (Cooldown_Spell_Canalise_hc <= diff)
+				{
+
+					Spell_canalisé_hc_home();
+					Cooldown_Spell_Canalise_hc = Cooldown_Spell_Canalise_hc_defaut;
+				}
+				else Cooldown_Spell_Canalise_hc -= diff;
+
 			}
 
 			void RetireBugDeCombat()
@@ -473,8 +487,8 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 			}
 			void Mouvement_All()
 			{
-				// Anti bug de combat
-				if (me->IsAlive() && (me->GetDistance(me->GetHomePosition()) >  50) )
+				// Anti bug de combat : si s'éloigne trop de son home : DistanceDeCast+20
+				if (me->IsAlive() && (me->GetDistance2d(me->GetHomePosition().GetPositionX(), me->GetHomePosition().GetPositionY()) > DistanceDeCast+20) )
 				{
 					RetireBugDeCombat();
 
@@ -487,12 +501,12 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 				}
 
 
-
+				// Si la cible est trop loin >DistanceDeCast
 				if (!UpdateVictim())
 					return;
 
 				Dist = me->GetDistance(me->GetVictim());
-				if ((Dist > DistanceDeCast) || (me->GetDistance2d(me->GetHomePosition().GetPositionX(), me->GetHomePosition().GetPositionY()) > 40))
+				if ((Dist > DistanceDeCast))
 				{
 					if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE) && me->IsInCombat())
 					{
@@ -501,7 +515,7 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 
 					RetireBugDeCombat();
 					me->AddUnitState(UNIT_STATE_EVADE);
-					EnterEvadeMode(EVADE_REASON_SEQUENCE_BREAK);						// Quite le combat si la cible > 30m (Caster & Mélée) ou > 40m de home
+					EnterEvadeMode(EVADE_REASON_SEQUENCE_BREAK);						
 				}
 			}
 			void Mouvement_Caster(uint32 diff)
@@ -544,10 +558,12 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 					// Mouvement aléatoire si cible < 6m & mana > 10%  
 					if (Dist <=5 && (Mana > MaxMana / 10) && (ForceBranche != 7 && ForceBranche <12 ))
 					{
+						
+						me->SetWalk(false);																// Ne pas marcher
 
 						if(!AuraLenteur() && !Interieur())
 						{
-							me->SetSpeedRate(MOVE_RUN, 1.2f); // Uniquement si non ralenti par un spell 
+							me->SetSpeedRate(MOVE_RUN, 1.1f); // Uniquement si non ralenti par un spell 
 						}
 
 						float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -739,6 +755,11 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 			}
 			bool AuraLenteur()
 			{
+				if (me->HasAura(137573)		// vitesse (+70%/4s) , annule tous les effets affectant le déplacement
+					|| me->HasAura(31224)	// Cape d'ombre    
+					|| me->HasAura(1856)	// Disparition
+					) return false;
+
 				if (me->HasAura(116)		// Eclair_de_givre 116 
 					|| me->HasAura(71318)	// Eclair_de_givre 71318
 					|| me->HasAura(31589)	// Lenteur 31589
@@ -756,6 +777,8 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 					|| me->HasAura(116095) 	// Handicap 116095
 					|| me->HasAura(300197) 	// Toucher_de_glace 300197
 					|| me->HasAura(20170)	// Sceau de justice 20170
+					|| me->HasAura(6343)	// Coup de tonnerre
+					|| me->HasAura(8147)	// Coup de tonnerre
 					) return true;
 				else return false;
 			}
@@ -778,7 +801,8 @@ public: Stitch_npc_ai_caster() : CreatureScript("Stitch_npc_ai_caster") { }
 				// Sort canalisé hors combat, doit etre fixe et en home 
 				if (Spell_Canalise_hc > 1 && !me->IsInCombat() && !me->HasAura(Spell_Canalise_hc))
 				{
-					me->CastSpell(me, Spell_Canalise_hc, true);
+					//me->CastSpell(me, Spell_Canalise_hc, true);
+					DoCast(me, Spell_Canalise_hc);
 				}
 			}
 			void Arme_rangé()

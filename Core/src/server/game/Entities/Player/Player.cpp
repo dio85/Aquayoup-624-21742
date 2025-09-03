@@ -931,7 +931,10 @@ void Player::HandleDrowning(uint32 time_diff)
                 m_MirrorTimer[FIRE_TIMER]+= 1*IN_MILLISECONDS;
                 // Calculate and deal damage
                 /// @todo Check this formula
-                uint32 damage = urand(600, 700);
+
+                //uint32 damage = urand(600, 700);
+				uint32 damage = getLevel()*7;					//Stitch lave , dégats d'environnement
+
                 if (m_MirrorTimerFlags & UNDERWATER_INLAVA)
                     EnvironmentalDamage(DAMAGE_LAVA, damage);
                 // need to skip Slime damage in Undercity,
@@ -24410,21 +24413,38 @@ uint32 Player::GetBarberShopCost(BarberShopStyleEntry const* newHairStyle, uint8
     return cost;
 }
 
+
+
+//Stitch Glyphes : apprentissage
 void Player::InitGlyphsForLevel()
 {
-    uint32 slotMask = 0;
-    uint8 slot = 0;
-    uint8 level = getLevel();
-    for (GlyphSlotEntry const* gs : sDB2Manager.GetGlyphSlots())
-    {
-        if (level >= ((gs->Tooltip + 1) * 25))
-            slotMask |= 1 << slot;
+	uint8 slotIndex = 0;
+	for (GlyphSlotEntry const* glyphSlot : sGlyphSlotStore)
+	{
+		if (slotIndex >6)
+			break;
 
-        SetGlyphSlot(slot++, gs->ID);
-    }
+		SetGlyphSlot(slotIndex, glyphSlot->ID);
+		++slotIndex;
+	}
 
-    SetUInt32Value(PLAYER_GLYPHS_ENABLED, slotMask);
+	uint8 level = getLevel();
+	uint32 slotMask = 0;
+
+	if (level >= 25)
+		slotMask |= 0x01 | 0x02 | 0x40;
+	if (level >= 50)
+		slotMask |= 0x04 | 0x08 | 0x80;
+	if (level >= 75)
+		slotMask |= 0x10 | 0x20 | 0x100;
+
+	SetUInt32Value(PLAYER_GLYPHS_ENABLED, slotMask);
 }
+
+
+
+	
+
 
 void Player::SetGlyph(uint8 slot, uint32 glyph)
 {

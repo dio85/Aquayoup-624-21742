@@ -21,6 +21,7 @@ Aquayoup.Solocraft = 1
 # FunHealSpell			- Defaut/Arcade : 2	- Coefficient de heal & Leech des sorts  fait par un joueur (1=50% | 2=normal | 3=150% | 4=200% etc)
 # FunSpeedCast			- Defaut/Arcade : 1	- Coefficient de temps pour lancer un sort (affichage non modifié) (1=Normal | 2=200% | 3=300% : tres lent)
 # FunArmor					- Defaut/Arcade : 1	- Coefficient d'armure (1=normal | 2=200% | 3=300% etc)
+# Rate.Mana  (mettre Rate.Mana = 0.45)
 
 FunAllStat = 2
 FunDamageDefaut = 1
@@ -2137,7 +2138,7 @@ Visibility.Notify.Period.InBGArenas   = 1000
 #                     1 - (Rate.Loyalty)
 
 Rate.Health            = 1
-Rate.Mana              = 2
+Rate.Mana              = 0.45
 Rate.Rage.Income       = 1
 Rate.Rage.Loss         = 1
 Rate.RunicPower.Income = 1
@@ -3204,7 +3205,10 @@ PlayerDump.DisallowOverwrite = 1
 #     UI.ShowQuestLevelsInDialogs
 #        Description: Show quest levels next to quest titles in UI dialogs
 #        Example:     [13] Westfall Stew
-#        Default:     0  - (Do not show)
+#        Default:       0 	- n'affiche rien avant le nom de la quete
+#							 1		- Affiche le level avant le nom de la quete
+#							 2		- Affiche l'ID avant le nom de la quete
+#							>2  	- n'affiche rien avant le nom de la quete
 
 UI.ShowQuestLevelsInDialogs = 0
 

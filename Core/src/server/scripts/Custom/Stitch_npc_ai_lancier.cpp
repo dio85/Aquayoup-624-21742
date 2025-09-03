@@ -46,6 +46,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 			uint32 ForceBranche = me->GetCreatureTemplate()->pickpocketLootId;
 			uint32 MessageAlagro = 0;
 			uint32 Spell_ContreAttaque = 0;
+			uint32 Spell_Canalise_hc = me->m_spells[7];								// Pour spell canalisé hors combat
 			float x = 0.0f, y = 0.0f, z = 0.0f;
 			uint32 mapid = 0;
 
@@ -66,6 +67,8 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 			uint32 Cooldown_Principal_B_Defaut = 3000;								
 			uint32 Cooldown_Principal_C = 250;										// Tempo pour arreter le mouvement
 			uint32 Cooldown_Principal_C_Defaut = 1500;
+			uint32 Cooldown_Spell_Canalise_hc = 3000;
+			uint32 Cooldown_Spell_Canalise_hc_defaut = 3000;						// Sort canalisé hors combat
 
 			// Spells
 			uint32 Buf_1 = 0;
@@ -167,6 +170,12 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 					ResteADistance = 10;
 				}
 
+				Cooldown_Spell_Canalise_hc_defaut = me->GetCurrentSpellCastTime(Spell_Canalise_hc);
+				if (Cooldown_Spell_Canalise_hc_defaut < 3000)
+					Cooldown_Spell_Canalise_hc_defaut = urand(5000,15000);
+
+				Cooldown_Spell_Canalise_hc_defaut = Cooldown_Spell_Canalise_hc_defaut + urand(1000, 2000);
+
 				// ################################################################################################################################################
 				// Divers
 				// ################################################################################################################################################
@@ -229,11 +238,18 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 
 				Random = urand(1, 3);
 				if (Random == 1 && Spell_respawn_evade != 0) { me->CastSpell(me, Spell_respawn_evade, true); }		// 1/3 Chance de lancer le sort au respawn ou evade
+
 			}
 			void JustReachedHome() override
 			{
 				me->SetReactState(REACT_AGGRESSIVE);
 				//me->SetSpeedRate(MOVE_RUN, 1.01f);										// Vitesse par defaut définit a 1.01f puisque le patch modification par type,famille test si 1.0f
+
+				if (Tir_1 != Lancer_une_Arme) { me->SetSheath(SHEATH_STATE_RANGED); }				// S'équipe d'arc ou fusil
+				else
+				{
+					me->SetSheath(SHEATH_STATE_MELEE);												// S'equipe de l'arme au contact
+				}
 			}
 			void UpdateAI(uint32 diff) override
 			{
@@ -251,11 +267,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 				else
 					Cooldown_Npc_Emotes -= diff;
 
-				if (Tir_1 != Lancer_une_Arme) { me->SetSheath(SHEATH_STATE_RANGED); }				// S'équipe d'arc ou fusil
-				else
-				{
-					me->SetSheath(SHEATH_STATE_MELEE);												// S'equipe de l'arme au contact
-				}
+
 				// ################################################################################################################################################
 				// En Combat ######################################################################################################################################
 				// ################################################################################################################################################
@@ -268,18 +280,9 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 					// Ce heal s'il a un sort de Heal(tir sur cible) -----------------------------------------------------------------
 					Heal_En_Combat_Caster(diff);
 
+					me->SetSheath(SHEATH_STATE_RANGED);
+
 					//----------------------------------------------------------------------------------------------------------------
-
-					if (Dist < 6)
-					{
-						me->SetSheath(SHEATH_STATE_MELEE);												// S'équipe d'armes au contact
-					}
-					else
-					{
-						if (Tir_1 != Lancer_une_Arme) { me->SetSheath(SHEATH_STATE_RANGED); }			// S'équipe d'arc ou fusil
-						else { me->SetSheath(SHEATH_STATE_MELEE); }										// S'équipe d'armes au contact
-					}
-
 
 					if (Start_Agro == 0)
 					{
@@ -318,6 +321,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 					// Combat au contat ---------------------------------------------------------------------------------------------------------------------------
 					if (Dist < 6)
 					{
+						me->SetSheath(SHEATH_STATE_MELEE);												// S'equipe de l'arme au contact
 						// Spell1 sur la cible  
 						if (Cooldown_Spell1 <= diff && Spell_1 !=0)
 						{
@@ -329,8 +333,6 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 							Cooldown_Spell1 = urand(3000,3500);
 						}
 						else Cooldown_Spell1 -= diff;
-					}
-
 
 
 						// Spell2 sur la cible  
@@ -341,14 +343,14 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 
 						}
 						else Cooldown_Spell2 -= diff;
+					}
 
 					// Combat a distance --------------------------------------------------------------------------------------------------------------------------
 					if (Dist >= 6)
 					{
 
-
 						// Spell1 sur la cible  
-						if (Cooldown_Spell1 <= diff && Spell_2 == 0)	//Uniquement si Spell_2 non defini et avec la cadence de Spell_1
+						if (Cooldown_Spell1 <= diff )	//Uniquement si Spell_2 non defini et avec la cadence de Spell_1
 						{
 							if (Tir_1 != Lancer_une_Arme) { me->SetSheath(SHEATH_STATE_RANGED); }				// S'équipe d'arc ou fusil
 							else
@@ -356,9 +358,17 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 								me->SetSheath(SHEATH_STATE_MELEE);												// S'equipe de l'arme au contact
 							}
 
+
 							me->StopMoving();
-							DoCast(victim, Tir_1);
-							Cooldown_Spell1 = urand(1500,2500);
+							if (Spell_2 != 0)
+							{
+								me->CastSpell(victim, Spell_2, true);
+							}
+							else
+								DoCast(victim, Tir_1);
+
+
+							Cooldown_Spell1 = urand(2500,3500);
 						}
 						else Cooldown_Spell1 -= diff;
 					}
@@ -378,6 +388,14 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 				}
 				// ################################################################################################################################################
 				Mouvement_All();
+
+				if (Cooldown_Spell_Canalise_hc <= diff)
+				{
+					Spell_canalisé_hc_home();
+					Cooldown_Spell_Canalise_hc = Cooldown_Spell_Canalise_hc_defaut;
+				}
+				else Cooldown_Spell_Canalise_hc -= diff;
+
 			}
 
 			void RetireBugDeCombat()
@@ -488,10 +506,11 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 					if (Dist <= 5)
 					{
 						me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);						// UNROOT
+						me->SetWalk(false);																// Ne pas marcher
 
 						if (AuraLenteur() == false)
 						{
-							me->SetSpeedRate(MOVE_RUN, 1.2f); // Uniquement si non ralenti par un spell joueur
+							me->SetSpeedRate(MOVE_RUN, 1.1f); // Uniquement si non ralenti par un spell joueur
 						}
 
 						x = (victim->GetPositionX() + irand(0, ResteADistance * 2) - ResteADistance);
@@ -590,6 +609,11 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 			}
 			bool AuraLenteur()
 			{
+				if (me->HasAura(137573)		// vitesse (+70%/4s) , annule tous les effets affectant le déplacement
+					|| me->HasAura(31224)	// Cape d'ombre    
+					|| me->HasAura(1856)	// Disparition
+					) return false;
+
 				if (me->HasAura(116)		// Eclair_de_givre 116 
 					|| me->HasAura(71318)	// Eclair_de_givre 71318
 					|| me->HasAura(31589)	// Lenteur 31589
@@ -607,6 +631,8 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 					|| me->HasAura(116095) 	// Handicap 116095
 					|| me->HasAura(300197) 	// Toucher_de_glace 300197
 					|| me->HasAura(20170)	// Sceau de justice 20170
+					|| me->HasAura(6343)	// Coup de tonnerre
+					|| me->HasAura(8147)	// Coup de tonnerre
 					) return true;
 				else return false;
 			}
@@ -618,6 +644,16 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 					) return true;
 				else return false;
 			}
+			void Spell_canalisé_hc_home()
+			{
+				// Sort canalisé hors combat, doit etre fixe et en home 
+				if (Spell_Canalise_hc > 1 && !me->IsInCombat() && !me->HasAura(Spell_Canalise_hc))
+				{
+					//me->CastSpell(me, Spell_Canalise_hc, true);
+					DoCast(me, Spell_Canalise_hc);
+				}
+			}
+
 		};
 
 
