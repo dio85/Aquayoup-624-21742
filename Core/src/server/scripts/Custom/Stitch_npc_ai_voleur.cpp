@@ -1,18 +1,13 @@
 ////#########################################################################################################################################################################################################################################
 // Copyright (C) Juillet 2020 Stitch pour Aquayoup
-// AI generique npc par classe : VOLEUR Ver 2022-07-31
+// AI generique npc par classe : VOLEUR Ver 2025-10-17
 // Il est possible d'influencer le temp entre 2 cast avec `BaseAttackTime` & `RangeAttackTime` 
+//
 // Necessite dans Creature_Template :
 // Minimun  : UPDATE `creature_template` SET `ScriptName` = 'Stitch_npc_ai_voleur',`AIName` = '' WHERE (entry = 15100010);
-// Optionel : UPDATE `creature_template` SET `HealthModifier` = 2, `ManaModifier` = 3, `ArmorModifier` = 1, `DamageModifier` = 2,`BaseAttackTime` = 2000, `RangeAttackTime` = 2000 WHERE(entry = 15100010);
 // Optionel : Utilisez pickpocketloot de creature_template pour passer certains parametres (Solution choisit afin de rester compatible avec tout les cores). Si pickpocketloot = 1 (branche1 forcé), pickpocketloot = 2 (branche2 forcé), etc
-//###########################################################################################################################################################################################################################################
+//
 // # npc de Test Stitch_npc_ai_voleur  .npc 15100010
-//REPLACE INTO `creature_template` (`entry`, `difficulty_entry_1`, `difficulty_entry_2`, `difficulty_entry_3`, `KillCredit1`, `KillCredit2`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, `name`, `femaleName`, `subname`, `IconName`, `gossip_menu_id`, `minlevel`, `maxlevel`, `exp`, `exp_unk`, `faction`, `npcflag`, `speed_walk`, `speed_run`, `scale`, `rank`, `dmgschool`, `BaseAttackTime`, `RangeAttackTime`, `BaseVariance`, `RangeVariance`, `unit_class`, `unit_flags`, `unit_flags2`, `dynamicflags`, `family`, `trainer_type`, `trainer_class`, `trainer_race`, `type`, `type_flags`, `type_flags2`, `lootid`, `pickpocketloot`, `skinloot`, `resistance1`, `resistance2`, `resistance3`, `resistance4`, `resistance5`, `resistance6`, `spell1`, `spell2`, `spell3`, `spell4`, `spell5`, `spell6`, `spell7`, `spell8`, `VehicleId`, `mingold`, `maxgold`, `AIName`, `MovementType`, `InhabitType`, `HoverHeight`, `HealthModifier`, `HealthModifierExtra`, `ManaModifier`, `ManaModifierExtra`, `ArmorModifier`, `DamageModifier`, `ExperienceModifier`, `RacialLeader`, `movementId`, `RegenHealth`, `mechanic_immune_mask`, `flags_extra`, `ScriptName`, `VerifiedBuild`) VALUES
-//(15100010, 0, 0, 0, 0, 0, 13171, 0, 0, 0, 'npc_ai_voleur', '', '', '', 0, 90, 90, 0, 0, 2102, 0, 1.01, 1.01, 1, 0, 0, 2000, 2000, 1, 1, 4, 0, 2048, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 0, 3, 1, 2, 1, 1, 1, 2, 2, 1, 0, 144, 1, 0, 0, 'Stitch_npc_ai_voleur', 20173);
-//REPLACE INTO `creature_equip_template` (`CreatureID`, `ID`, `ItemID1`, `ItemID2`, `ItemID3`, `VerifiedBuild`) VALUES
-//(15100010, 1, 2209, 2209, 0, 0),
-//(15101510, 2, 36669, 36669, 0, 0);
 //###########################################################################################################################################################################################################################################
 
 #include "CreatureTextMgr.h"
@@ -198,7 +193,7 @@ public: Stitch_npc_ai_voleur() : CreatureScript("Stitch_npc_ai_voleur") { }
 				if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
 				{
 					me->StopMoving();
-					me->GetMotionMaster()->MoveIdle();
+					//me->GetMotionMaster()->MoveIdle();
 				}
 
 				//Retire certaines Aura, emotes & Bytes a l'agro
@@ -563,7 +558,7 @@ public: Stitch_npc_ai_voleur() : CreatureScript("Stitch_npc_ai_voleur") { }
 
 			void Tourne_Au_Tour_En_Combat()
 			{
-				if (!UpdateVictim())
+				if (!UpdateVictim() || AuraFigé())
 					return;
 
 				Unit* victim = me->GetVictim();
@@ -588,7 +583,7 @@ public: Stitch_npc_ai_voleur() : CreatureScript("Stitch_npc_ai_voleur") { }
 			}
 			void Avance_3m_En_Combat()
 			{
-				if (!UpdateVictim())
+				if (!UpdateVictim() || AuraFigé())
 					return;
 
 				Unit* victim = me->GetVictim();
@@ -696,6 +691,7 @@ public: Stitch_npc_ai_voleur() : CreatureScript("Stitch_npc_ai_voleur") { }
 					|| me->HasAura(20170)	// Sceau de justice 20170
 					|| me->HasAura(6343)	// Coup de tonnerre
 					|| me->HasAura(8147)	// Coup de tonnerre
+					|| me->HasAura(3600)	// Totem de Lien à la terre
 					) return true;
 				else return false;
 			}
@@ -704,6 +700,15 @@ public: Stitch_npc_ai_voleur() : CreatureScript("Stitch_npc_ai_voleur") { }
 				if (me->HasAura(122)		// Nova de givre
 					|| me->HasAura(3600)	// Totem de lien terrestre
 					|| me->HasAura(6474)	// Totem de lien terrestre passif
+					|| me->HasAura(33844)	// Sarments 4s
+					|| me->HasAura(22127)	// Sarments 6s
+					|| me->HasAura(31409)	// Sarment multiple
+					|| me->HasAura(160402)	// Emprise terrestre (4s, 30m, comme Sarment mais avec des rocher )
+					|| me->HasAura(45524)	// Chaînes de glace
+					|| me->HasAura(853)		// Marteau de la justice
+					|| me->HasAura(339)		// Sarment du Totem de poigne de terre
+					|| me->HasAura(64695)	// Sarment du Totem de poigne de terre
+					|| me->HasAura(125467)	// Auto ROOT
 					) return true;
 				else return false;
 			}

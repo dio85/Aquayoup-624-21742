@@ -41,6 +41,9 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 			Unit* victim = me->GetVictim();										 
 			uint32 MessageAlagro = 0;
 			uint32 Spell_ContreAttaque = 0;
+			uint32 Demande_Assistance_effectué = 0;
+			uint32 auto_peur5s = 8225;
+			uint8 me_rank = me->GetCreatureTemplate()->rank;
 
 			// Definitions des variables Cooldown et le 1er lancement
 			uint32 Cooldown_Spell1 = 500;
@@ -55,6 +58,7 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 			uint32 Spell_Heal = 0;
 			uint32 Cooldown_Spell_ContreAttaque = 4000;
 			uint32 Cooldown_Spell_ContreAttaque_defaut = 8000;
+			uint32 Cooldown_Demande_Assistance = 3000;
 
 			// Spells
 			uint32 Buf_1 = 12712;																			// Soldat aguerri
@@ -165,7 +169,7 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 				if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
 				{
 					me->StopMoving();
-					me->GetMotionMaster()->MoveIdle();
+					//me->GetMotionMaster()->MoveIdle();
 				}
 
 				//Retire certaines Aura, emotes & Bytes a l'agro
@@ -186,6 +190,7 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 			void EnterEvadeMode(EvadeReason /*why*/) override
 			{
 				Start_Agro = 0;
+				Demande_Assistance_effectué = 0;
 				RetireBugDeCombat();
 				me->AddUnitState(UNIT_STATE_EVADE);
 				//me->SetSpeedRate(MOVE_RUN, 1.5f);													// Vitesse de déplacement
@@ -322,7 +327,7 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 
 					ContreAttaque(diff);
 					Mouvement_Contact(diff);
-
+					Demande_Assistance(diff);
 					// ############################################################################################################################################
 				}
 				// ################################################################################################################################################
@@ -449,7 +454,7 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 			}
 			void Tourne_Au_Tour_En_Combat()
 			{
-				if (!UpdateVictim())
+				if (!UpdateVictim() || AuraFigé())
 					return;
 
 				Unit* victim = me->GetVictim();
@@ -474,7 +479,7 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 			}
 			void Avance_3m_En_Combat()
 			{
-				if (!UpdateVictim())
+				if (!UpdateVictim() || AuraFigé())
 					return;
 
 				Unit* victim = me->GetVictim();
@@ -570,6 +575,7 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 					|| me->HasAura(20170)	// Sceau de justice 20170
 					|| me->HasAura(6343)	// Coup de tonnerre
 					|| me->HasAura(8147)	// Coup de tonnerre
+					|| me->HasAura(3600)	// Totem de Lien à la terre
 					) return true;
 				else return false;
 			}
@@ -578,6 +584,16 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 				if (me->HasAura(122)		// Nova de givre
 					|| me->HasAura(3600)	// Totem de lien terrestre
 					|| me->HasAura(6474)	// Totem de lien terrestre passif
+					|| me->HasAura(33844)	// Sarments 4s
+					|| me->HasAura(22127)	// Sarments 6s
+					|| me->HasAura(31409)	// Sarment multiple
+					|| me->HasAura(160402)	// Emprise terrestre (4s, 30m, comme Sarment mais avec des rocher )
+					|| me->HasAura(45524)	// Chaînes de glace
+					|| me->HasAura(853)		// Marteau de la justice
+					|| me->HasAura(339)		// Sarment du Totem de poigne de terre
+					|| me->HasAura(64695)	// Sarment du Totem de poigne de terre
+					|| me->HasAura(125467)	// Auto ROOT
+					|| me->HasAura(31736)	// Quete 9720
 					) return true;
 				else return false;
 			}
@@ -612,6 +628,29 @@ public: Stitch_npc_ai_melee() : CreatureScript("Stitch_npc_ai_melee") { }
 					return;
 
 				me->SetSheath(SHEATH_STATE_UNARMED);								//Arme rangée
+			}
+
+			void Demande_Assistance(uint32 diff)
+			{
+				if (Demande_Assistance_effectué == 1 || AuraLenteur() == true || !UpdateVictim() || me_rank != 0)
+					return;
+
+				if (Cooldown_Demande_Assistance <= diff)
+				{
+					if ((me->GetHealth() < (me->GetMaxHealth()*0.20)))
+					{
+						if (urand(1, 4) == 1)
+						{
+							me->CastSpell(me, auto_peur5s, true);
+							Demande_Assistance_effectué = 1;
+							Cooldown_ResteADistance = Cooldown_ResteADistance_defaut;
+							Cooldown_Spell1 = 3000;
+							Cooldown_Spell2 = 6000;
+						}
+						Cooldown_Demande_Assistance = 3000;
+					}
+				}
+				else Cooldown_Demande_Assistance -= diff;
 			}
 		};
 

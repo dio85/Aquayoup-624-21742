@@ -1,10 +1,9 @@
 ////#########################################################################################################################################################################################################################################
 // Copyright (C) Juin 2020 Stitch pour Aquayoup
-// AI generique npc par classe : PRETRE Ver 2022-07-31
+// AI generique npc par classe : PRETRE Ver 2025-10
 // Il est possible d'influencer le temp entre 2 cast avec `BaseAttackTime` & `RangeAttackTime` 
 // Necessite dans Creature_Template :
 // Minimun  : UPDATE `creature_template` SET `ScriptName` = 'Stitch_npc_ai_pretre',`AIName` = '' WHERE (entry = 15100003);
-// Optionel : UPDATE `creature_template` SET `HealthModifier` = 2, `ManaModifier` = 3, `ArmorModifier` = 1, `DamageModifier` = 2,`BaseAttackTime` = 2000, `RangeAttackTime` = 2000 WHERE(entry = 15100003);
 // Optionel : Utilisez pickpocketloot de creature_template pour passer certains parametres (Solution choisit afin de rester compatible avec tout les cores). Si pickpocketloot = 1 (branche1 forcé), pickpocketloot = 2 (branche2 forcé), etc
 //###########################################################################################################################################################################################################################################
 // # npc de Test Stitch_npc_ai_pretre  .npc 15100003
@@ -144,7 +143,7 @@ public: Stitch_npc_ai_pretre() : CreatureScript("Stitch_npc_ai_pretre") { }
 				}
 				else
 				{
-					ResteADistance = 10;
+					ResteADistance = 7;
 				}
 
 				switch (BrancheSpe)
@@ -199,7 +198,7 @@ public: Stitch_npc_ai_pretre() : CreatureScript("Stitch_npc_ai_pretre") { }
 				if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
 				{
 					me->StopMoving();
-					me->GetMotionMaster()->MoveIdle();
+					//me->GetMotionMaster()->MoveIdle();
 				}
 				me->SetSheath(SHEATH_STATE_MELEE);									//Arme sortie
 
@@ -649,6 +648,7 @@ public: Stitch_npc_ai_pretre() : CreatureScript("Stitch_npc_ai_pretre") { }
 					|| me->HasAura(20170)	// Sceau de justice 20170
 					|| me->HasAura(6343)	// Coup de tonnerre
 					|| me->HasAura(8147)	// Coup de tonnerre
+					|| me->HasAura(3600)	// Totem de Lien à la terre
 					) return true;
 				else return false;
 			}
@@ -657,6 +657,15 @@ public: Stitch_npc_ai_pretre() : CreatureScript("Stitch_npc_ai_pretre") { }
 				if (me->HasAura(122)		// Nova de givre
 					|| me->HasAura(3600)	// Totem de lien terrestre
 					|| me->HasAura(6474)	// Totem de lien terrestre passif
+					|| me->HasAura(33844)	// Sarments 4s
+					|| me->HasAura(22127)	// Sarments 6s
+					|| me->HasAura(31409)	// Sarment multiple
+					|| me->HasAura(160402)	// Emprise terrestre (4s, 30m, comme Sarment mais avec des rocher )
+					|| me->HasAura(45524)	// Chaînes de glace
+					|| me->HasAura(853)		// Marteau de la justice
+					|| me->HasAura(339)		// Sarment du Totem de poigne de terre
+					|| me->HasAura(64695)	// Sarment du Totem de poigne de terre
+					|| me->HasAura(125467)	// Auto ROOT
 					) return true;
 				else return false;
 			}

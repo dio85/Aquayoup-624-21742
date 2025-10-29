@@ -1,10 +1,9 @@
 ////#########################################################################################################################################################################################################################################
 // Copyright (C) Juin 2020 Stitch pour Aquayoup
-// AI generique npc par classe : DK Ver 2022-07-31
+// AI generique npc par classe : DK Ver 2025-10
 // Il est possible d'influencer le temp entre 2 cast avec `BaseAttackTime` & `RangeAttackTime` 
 // Necessite dans Creature_Template :
 // Minimun  : UPDATE `creature_template` SET `ScriptName` = 'Stitch_npc_ai_dk',`AIName` = '' WHERE (entry = 15100009);
-// Optionel : UPDATE `creature_template` SET `HealthModifier` = 2, `ManaModifier` = 3, `ArmorModifier` = 1, `DamageModifier` = 2,`BaseAttackTime` = 2000, `RangeAttackTime` = 2000 WHERE(entry = 15100009);
 // Optionel : Utilisez pickpocketloot de creature_template pour passer certains parametres (Solution choisit afin de rester compatible avec tout les cores). Si pickpocketloot = 1 (branche1 forcé), pickpocketloot = 2 (branche2 forcé), etc
 //###########################################################################################################################################################################################################################################
 // # npc de Test Stitch_npc_ai_dk  .npc 15100009
@@ -145,6 +144,7 @@ public: Stitch_npc_ai_dk() : CreatureScript("Stitch_npc_ai_dk") { }
 					me->CastSpell(me, Tmp, true);
 				}
 				me->SetSheath(SHEATH_STATE_UNARMED);								//Arme rangée
+				VisuelPowerRunic();
 			}
 
 			void Init_AI()
@@ -253,7 +253,7 @@ public: Stitch_npc_ai_dk() : CreatureScript("Stitch_npc_ai_dk") { }
 					}
 					else
 					{
-						ResteADistance = 10;
+						ResteADistance = 7;
 					}
 
 					Cooldown_ResteADistance = 1000;
@@ -288,7 +288,7 @@ public: Stitch_npc_ai_dk() : CreatureScript("Stitch_npc_ai_dk") { }
 				if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
 				{
 					me->StopMoving();
-					me->GetMotionMaster()->MoveIdle();
+					//me->GetMotionMaster()->MoveIdle();
 				}
 				me->SetSheath(SHEATH_STATE_MELEE);									//Arme sortie
 
@@ -896,7 +896,7 @@ public: Stitch_npc_ai_dk() : CreatureScript("Stitch_npc_ai_dk") { }
 
 			void Tourne_Au_Tour_En_Combat()
 			{
-				if (!UpdateVictim())
+				if (!UpdateVictim() || AuraFigé())
 					return;
 
 				Unit* victim = me->GetVictim();
@@ -921,7 +921,7 @@ public: Stitch_npc_ai_dk() : CreatureScript("Stitch_npc_ai_dk") { }
 			}
 			void Avance_3m_En_Combat()
 			{
-				if (!UpdateVictim())
+				if (!UpdateVictim() || AuraFigé())
 					return;
 
 				Unit* victim = me->GetVictim();
@@ -1041,6 +1041,7 @@ public: Stitch_npc_ai_dk() : CreatureScript("Stitch_npc_ai_dk") { }
 					|| me->HasAura(20170)	// Sceau de justice 20170
 					|| me->HasAura(6343)	// Coup de tonnerre
 					|| me->HasAura(8147)	// Coup de tonnerre
+					|| me->HasAura(3600)	// Totem de Lien à la terre
 					) return true;
 				else return false;
 			}
@@ -1049,6 +1050,15 @@ public: Stitch_npc_ai_dk() : CreatureScript("Stitch_npc_ai_dk") { }
 				if (me->HasAura(122)		// Nova de givre
 					|| me->HasAura(3600)	// Totem de lien terrestre
 					|| me->HasAura(6474)	// Totem de lien terrestre passif
+					|| me->HasAura(33844)	// Sarments 4s
+					|| me->HasAura(22127)	// Sarments 6s
+					|| me->HasAura(31409)	// Sarment multiple
+					|| me->HasAura(160402)	// Emprise terrestre (4s, 30m, comme Sarment mais avec des rocher )
+					|| me->HasAura(45524)	// Chaînes de glace
+					|| me->HasAura(853)		// Marteau de la justice
+					|| me->HasAura(339)		// Sarment du Totem de poigne de terre
+					|| me->HasAura(64695)	// Sarment du Totem de poigne de terre
+					|| me->HasAura(125467)	// Auto ROOT
 					) return true;
 				else return false;
 			}

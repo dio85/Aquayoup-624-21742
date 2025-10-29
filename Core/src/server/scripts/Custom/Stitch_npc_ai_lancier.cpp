@@ -49,6 +49,9 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 			uint32 Spell_Canalise_hc = me->m_spells[7];								// Pour spell canalisé hors combat
 			float x = 0.0f, y = 0.0f, z = 0.0f;
 			uint32 mapid = 0;
+			uint32 Demande_Assistance_effectué = 0;
+			uint32 auto_peur5s = 8225;
+			uint8 me_rank = me->GetCreatureTemplate()->rank;
 
 			// Definitions des variables Cooldown et le 1er lancement
 			uint32 Cooldown_Spell1 = 1000;
@@ -69,6 +72,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 			uint32 Cooldown_Principal_C_Defaut = 1500;
 			uint32 Cooldown_Spell_Canalise_hc = 3000;
 			uint32 Cooldown_Spell_Canalise_hc_defaut = 3000;						// Sort canalisé hors combat
+			uint32 Cooldown_Demande_Assistance = 3000;
 
 			// Spells
 			uint32 Buf_1 = 0;
@@ -167,7 +171,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 				}
 				else
 				{
-					ResteADistance = 10;
+					ResteADistance = 7;
 				}
 
 				Cooldown_Spell_Canalise_hc_defaut = me->GetCurrentSpellCastTime(Spell_Canalise_hc);
@@ -208,7 +212,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 				if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
 				{
 					me->StopMoving();
-					me->GetMotionMaster()->MoveIdle();
+					//me->GetMotionMaster()->MoveIdle();
 				}
 
 				//Retire certaines Aura, emotes & Bytes a l'agro
@@ -230,6 +234,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 			void EnterEvadeMode(EvadeReason /*why*/) override
 			{
 				Start_Agro = 0;
+				Demande_Assistance_effectué = 0;
 				RetireBugDeCombat();
 				me->AddUnitState(UNIT_STATE_EVADE);
 				me->GetMotionMaster()->MoveTargetedHome();											// Retour home
@@ -388,6 +393,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 				}
 				// ################################################################################################################################################
 				Mouvement_All();
+				Demande_Assistance(diff);
 
 				if (Cooldown_Spell_Canalise_hc <= diff)
 				{
@@ -633,6 +639,7 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 					|| me->HasAura(20170)	// Sceau de justice 20170
 					|| me->HasAura(6343)	// Coup de tonnerre
 					|| me->HasAura(8147)	// Coup de tonnerre
+					|| me->HasAura(3600)	// Totem de Lien à la terre
 					) return true;
 				else return false;
 			}
@@ -641,6 +648,16 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 				if (me->HasAura(122)		// Nova de givre
 					|| me->HasAura(3600)	// Totem de lien terrestre
 					|| me->HasAura(6474)	// Totem de lien terrestre passif
+					|| me->HasAura(33844)	// Sarments 4s
+					|| me->HasAura(22127)	// Sarments 6s
+					|| me->HasAura(31409)	// Sarment multiple
+					|| me->HasAura(160402)	// Emprise terrestre (4s, 30m, comme Sarment mais avec des rocher )
+					|| me->HasAura(45524)	// Chaînes de glace
+					|| me->HasAura(853)		// Marteau de la justice
+					|| me->HasAura(339)		// Sarment du Totem de poigne de terre
+					|| me->HasAura(64695)	// Sarment du Totem de poigne de terre
+					|| me->HasAura(125467)	// Auto ROOT
+					|| me->HasAura(31736)	// Quete 9720
 					) return true;
 				else return false;
 			}
@@ -654,6 +671,28 @@ public: Stitch_npc_ai_lancier() : CreatureScript("Stitch_npc_ai_lancier") { }
 				}
 			}
 
+			void Demande_Assistance(uint32 diff)
+			{
+				if (Demande_Assistance_effectué == 1 || AuraLenteur() == true || !UpdateVictim() || me_rank != 0)
+					return;
+
+				if (Cooldown_Demande_Assistance <= diff)
+				{
+					if ((me->GetHealth() < (me->GetMaxHealth()*0.20)))
+					{
+						if (urand(1, 3) == 1)
+						{
+							me->CastSpell(me, auto_peur5s, true);
+							Demande_Assistance_effectué = 1;
+							Cooldown_ResteADistance = Cooldown_ResteADistance_Defaut;
+							Cooldown_Spell1 = 3000;
+							Cooldown_Spell2 = 5000;
+						}
+						Cooldown_Demande_Assistance = 3000;
+					}
+				}
+				else Cooldown_Demande_Assistance -= diff;
+			}
 		};
 
 

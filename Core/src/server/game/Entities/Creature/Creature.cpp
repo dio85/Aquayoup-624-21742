@@ -421,7 +421,7 @@ bool Creature::InitEntry(uint32 entry, CreatureData const* data /*= nullptr*/)
 
 
 
-	//Stitch vitesse de deplacement des civils
+	//Stitch vitesse de deplacement de divers PNJ, hors combat
 	uint32 Crtype = GetCreatureTemplate()->type;
 	uint32 Crfamily = GetCreatureTemplate()->family;
 	float Crspeed = GetCreatureTemplate()->speed_walk;
@@ -431,10 +431,8 @@ bool Creature::InitEntry(uint32 entry, CreatureData const* data /*= nullptr*/)
 	// Civils
 	if (Crentry >= 1000100 && Crentry <= 1001000)
 	{
-		SetSpeedRate(MOVE_WALK, frand(0.5f, 1.2f));							// hors combat
+		SetSpeedRate(MOVE_WALK, frand(0.5f, 1.2f));
 	}
-	
-	
 
 
 
@@ -562,6 +560,7 @@ void Creature::Update(uint32 diff)
 	uint32 Crtype = GetCreatureTemplate()->type;
 	uint32 Crfamily = GetCreatureTemplate()->family;
 	float Crspeed = GetCreatureTemplate()->speed_walk;
+	uint32 Crentry = GetCreatureTemplate()->Entry;
 
 	if (Crspeed == 1.0f  && !this->IsInWater() )
 	{
@@ -756,6 +755,7 @@ void Creature::Update(uint32 diff)
 		case CREATURE_FAMILY_STORMELEMENTAL:		// elementaire de tempete
 			SetSpeedRate(MOVE_WALK, 0.75f);							// hors combat
 			SetSpeedRate(MOVE_RUN, 1.5f);							// en combat
+			SetSpeedRate(MOVE_SWIM, 0.5f);							// en nageant:
 			break;
 
 		case CREATURE_FAMILY_IMP:					// Imp
@@ -801,7 +801,7 @@ void Creature::Update(uint32 diff)
 		case CREATURE_FAMILY_NAGA:
 			SetSpeedRate(MOVE_WALK, 0.5f);							// hors combat
 			SetSpeedRate(MOVE_RUN, 1.0f);							// en combat
-			SetSpeedRate(MOVE_SWIM, 0.8f);							// en nageant
+			SetSpeedRate(MOVE_SWIM, 1.2);							// en nageant
 			break;
 
 		case CREATURE_FAMILY_RIVERBEAST:
@@ -837,15 +837,27 @@ void Creature::Update(uint32 diff)
 		case CREATURE_FAMILY_CREATURE_AQUATIQUE:	//CUSTOM 158
 			SetSpeedRate(MOVE_WALK, 0.5f);							// hors combat
 			SetSpeedRate(MOVE_RUN, 1.1f);							// en combat
-			SetSpeedRate(MOVE_SWIM, 0.5f);							// en nageant
+			SetSpeedRate(MOVE_SWIM, 2.0f);							// en nageant
 			break;
 
-		case CREATURE_FAMILY_SENTERRE_FIXE:				//Custom 159
+		case CREATURE_FAMILY_SENTERRE_FIXE:			//Custom 159
 			SetSpeedRate(MOVE_WALK, 0.1f);							// hors combat
 			SetSpeedRate(MOVE_RUN, 0.1f);							// en combat
 			SetSpeedRate(MOVE_SWIM, 0.1f);							// en nageant
 			break;
 
+		case CREATURE_FAMILY_TOURELLE_FIXE:			//Custom 160
+			SetSpeedRate(MOVE_WALK, 0.1f);							// hors combat
+			SetSpeedRate(MOVE_RUN, 0.1f);							// en combat
+			SetSpeedRate(MOVE_SWIM, 0.1f);							// en nageant
+			SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);		// ROOT
+			break;
+
+		case CREATURE_FAMILY_SENTERRE_REMOU_CLAIR_CONTACT: //CUSTOM 161
+			SetSpeedRate(MOVE_WALK, 0.5f);							// hors combat
+			SetSpeedRate(MOVE_RUN, 0.9f);							// en combat
+			SetSpeedRate(MOVE_SWIM, 0.5f);							// en nageant
+			break;
 
 		default:
 			//SetSpeedRate(MOVE_WALK, 0.5f);						// hors combat
@@ -856,7 +868,7 @@ void Creature::Update(uint32 diff)
 		}
 	}
 
-	if (this->HasAura(137358))									//Stitch vitese reduite si No_model , par exemple pour déplacement sous terre
+	if (this->HasAura(137358))									//Stitch vitesse reduite si No_model , par exemple pour déplacement sous terre
 	{
 		SetSpeedRate(MOVE_WALK, 0.5f);							// hors combat
 		SetSpeedRate(MOVE_RUN, 0.5f);							// en combat
@@ -992,6 +1004,12 @@ void Creature::Update(uint32 diff)
 				SetSpeedRate(MOVE_SWIM, 0.1f);			// en nageant
 				break;
 
+			case CREATURE_FAMILY_TOURELLE_FIXE:			//Custom 160
+				SetSpeedRate(MOVE_SWIM, 0.1f);							// en nageant
+				SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);		// ROOT
+				break;
+
+
 			case CREATURE_FAMILY_CRAB:					// Crabe
 			case CREATURE_FAMILY_TURTLE:				// Tortue
 			case CREATURE_FAMILY_RIVERBEAST:
@@ -1000,7 +1018,6 @@ void Creature::Update(uint32 diff)
 
 			case CREATURE_FAMILY_HYDRA:					// Hydre
 			case CREATURE_FAMILY_NAGA:					// Naga
-				SetSpeedRate(MOVE_RUN, 1.1f);			// en combat
 				SetSpeedRate(MOVE_SWIM, 2.0f);
 				break;
 			case CREATURE_FAMILY_CREATURE_AQUATIQUE:
@@ -1013,6 +1030,15 @@ void Creature::Update(uint32 diff)
 			}
 		}
 
+	}
+
+
+	// Pnj divers
+	switch (Crentry)
+	{
+	case 19155: // Sporelin réfugié
+		SetSpeedRate(MOVE_WALK, frand(0.5f, 1.2f));
+		break;
 	}
 
 	//Stitch Les mobs font des bulles sous l'eau , si si c'est vrais

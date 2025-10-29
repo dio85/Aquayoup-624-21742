@@ -1,10 +1,8 @@
 ////#########################################################################################################################################################################################################################################
-// Copyright (C) Juillet 2020 Stitch pour https:\\Aquayoup.123.fr
-// AI generique npc par famille : Mobs Ver 2024-07-30 (family)
+// Copyright (C) Juillet 2020 Stitch pour Aquayoup
+// AI generique npc par famille : Mobs Ver 2025-10
 //
 // Si spell[1] = 0 : alors affectation aléatoire de tous les spells(prédéfini dans le core), sinon utilisera les spells définis dans creature_template spell[1 a 5]
-// BETE
-// UPDATE `creature_template` SET `spell1` = ATTAQUE, `spell2` = DOT, `spell3` = AGRO, `spell4` = EVADE, `spell5` = BUF, `ScriptName` = 'Stitch_npc_ai_mobs', `AIName` = '' WHERE(entry = 15100015);
 
 // spell1 : Attaque principale
 // spell2 : Dot
@@ -12,62 +10,6 @@
 // spell4 : spell lancé a l'évade ou respawn
 // spell5 : Buf
 // spell6 : Heal(lui même uniquement)
-
-/*
-1     Loup - CREATURE_FAMILY_WOLF								UPDATE `creature_template` SET `modelid1` = 903, `family` = 1,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Loup', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-2     Felin - CREATURE_FAMILY_CAT								UPDATE `creature_template` SET `modelid1` = 320, `family` = 2,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Felin', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-3 	  Araignee - CREATURE_FAMILY_SPIDER							UPDATE `creature_template` SET `modelid1` = 513, `family` = 3,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Araignée', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-4 	  Ours - CREATURE_FAMILY_BEAR								UPDATE `creature_template` SET `modelid1` = 820, `family` = 4,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Ours', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-5 	  Sanglier - CREATURE_FAMILY_BOAR							UPDATE `creature_template` SET `modelid1` = 503, `family` = 5,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Sanglier', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-6	  Crocodile - CREATURE_FAMILY_CROCOLISK						UPDATE `creature_template` SET `modelid1` = 1039, `family` = 6,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Crocodile', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-7 	  Oiseau charogniar - CREATURE_FAMILY_CARRION_BIRD			UPDATE `creature_template` SET `modelid1` = 2305,`family` = 7,`InhabitType` = 4, `unit_class` = 1,`name` = 'npc_ai_Charognard', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-8 	  Crabe - CREATURE_FAMILY_CRAB								UPDATE `creature_template` SET `modelid1` = 1938,`family` = 8,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Crabe', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-9 	  Gorille - CREATURE_FAMILY_GORILLA							UPDATE `creature_template` SET `modelid1` = 809, `family` = 9,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Gorille', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-11    Raptor - CREATURE_FAMILY_RAPTOR							UPDATE `creature_template` SET `modelid1` =1747, `family` = 11,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Raptor', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-16    Marcheur du Vide - CREATURE_FAMILY_VOIDWALKER				UPDATE `creature_template` SET `modelid1` =1132, `family` = 16,`InhabitType` = 3, `unit_class` = 4,`name` = 'npc_ai_Marcheur_du_Vide', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-17    Succube - CREATURE_FAMILY_SUCCUBUS						UPDATE `creature_template` SET `modelid1` =4162, `family` = 17,`InhabitType` = 3, `unit_class` = 4,`name` = 'npc_ai_Succube', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-19    Garde funeste (Doomguard) - CREATURE_FAMILY_DOOMGUARD		UPDATE `creature_template` SET `modelid1`=65072, `family` = 19,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Garde funeste', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-20    Scorpion - CREATURE_FAMILY_SCORPID						UPDATE `creature_template` SET `modelid1`= 9749, `family` = 20,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Scorpion', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-21    Tortue - CREATURE_FAMILY_TURTLE							UPDATE `creature_template` SET `modelid1`= 45691,`family` = 21,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Tortue', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-23    Diablotin (Imp) - CREATURE_FAMILY_IMP						UPDATE `creature_template` SET `modelid1`= 10812,`family` = 23,`InhabitType` = 3, `unit_class` = 4,`name` = 'npc_ai_Imp', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-24    Chauve-Souris - CREATURE_FAMILY_BAT						UPDATE `creature_template` SET `modelid1`= 47213,`family` = 24,`InhabitType` = 4, `unit_class` = 1,`name` = 'npc_ai_Chauve-Souris', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-25    Hyene - CREATURE_FAMILY_HYENA								UPDATE `creature_template` SET `modelid1`= 1536, `family` = 25,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Hyene', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-26    Oiseau de proie - CREATURE_FAMILY_BIRD_OF_PREY			UPDATE `creature_template` SET `modelid1`= 34007,`family` = 26,`InhabitType` = 4, `unit_class` = 1,`name` = 'npc_ai_Oiseau de proie', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-27    Serpent des vents - CREATURE_FAMILY_WIND_SERPENT			UPDATE `creature_template` SET `modelid1`= 10991,`family` = 27,`InhabitType` = 5, `unit_class` = 2,`name` = 'npc_ai_Serpent des vents', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-29    Gangregarde (Felguard) - CREATURE_FAMILY_FELGUARD			UPDATE `creature_template` SET `modelid1`= 7970, `family` = 29,`InhabitType` = 3, `unit_class` = 4,`name` = 'npc_ai_ Gangregarde', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-30    Faucon dragon - CREATURE_FAMILY_DRAGONHAWK				UPDATE `creature_template` SET `modelid1`= 29363,`family` = 30,`InhabitType` = 5, `unit_class` = 2,`name` = 'npc_ai_Faucon dragon', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-31    Ravageur - CREATURE_FAMILY_RAVAGER						UPDATE `creature_template` SET `modelid1`= 16631,`family` = 31,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Ravageur', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-34    Raie du Neant - CREATURE_FAMILY_NETHER_RAY				UPDATE `creature_template` SET `modelid1`= 21155,`family` = 34,`InhabitType` = 4, `unit_class` = 2,`name` = 'npc_ai_Raie du Neant', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-35    Serpent - CREATURE_FAMILY_SERPENT							UPDATE `creature_template` SET `modelid1`= 33990,`family` = 35,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Serpent', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-37    Papillon de nuit - CREATURE_FAMILY_MOTH					UPDATE `creature_template` SET `modelid1`= 17798,`family` = 37,`InhabitType` = 4, `unit_class` = 2,`name` = 'npc_ai_Papillon', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-38    Chimere - CREATURE_FAMILY_CHIMAERA						UPDATE `creature_template` SET `modelid1`= 20571,`family` = 38,`InhabitType` = 4, `unit_class` = 2,`name` = 'npc_ai_Chimere', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-39    Diablosaure - CREATURE_FAMILY_DEVILSAUR					UPDATE `creature_template` SET `modelid1`= 5238, `family` = 39,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Diablosaure', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-40    Goule - CREATURE_FAMILY_GHOUL								UPDATE `creature_template` SET `modelid1`= 26329,`family` = 40,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Goule', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-42    Ver - CREATURE_FAMILY_WORM								UPDATE `creature_template` SET `modelid1`= 7549, `family` = 42,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Ver', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-43    Rhinoceros - CREATURE_FAMILY_RHINO						UPDATE `creature_template` SET `modelid1`= 26280,`family` = 43,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Rhinoceros', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-44    Guepe - CREATURE_FAMILY_WASP								UPDATE `creature_template` SET `modelid1`= 37743,`family` = 44,`InhabitType` = 4, `unit_class` = 1,`name` = 'npc_ai_Guepe', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-45    Chien de base - CREATURE_FAMILY_CORE_HOUND				UPDATE `creature_template` SET `modelid1`= 24908,`family` = 45,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Chien de base', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-49    Elementaire d'eau - CREATURE_FAMILY_WATER_ELEMENTAL		UPDATE `creature_template` SET `modelid1`= 525,  `family` = 49,`InhabitType` = 1, `unit_class` = 2,`name` = "npc_ai_Elementaire d'eau", `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-50    Renard - CREATURE_FAMILY_FOX								UPDATE `creature_template` SET `modelid1`= 30302,`family` = 50,`InhabitType` = 1, `unit_class` = 1,`name` = "npc_ai_Renard", `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-51    Singe - CREATURE_FAMILY_MONKEY							UPDATE `creature_template` SET `modelid1`= 30180,`family` = 51,`InhabitType` = 1, `unit_class` = 1,`name` = "npc_ai_Singe", `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-52    Chien - CREATURE_FAMILY_DOG								UPDATE `creature_template` SET `modelid1`= 24908,`family` = 52,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Chien', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-55    Araignee de schiste - CREATURE_FAMILY_SHALE_SPIDER		UPDATE `creature_template` SET `modelid1`= 46290,`family` = 55,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Araignee de schiste', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-56    Zombie - CREATURE_FAMILY_ZOMBIE							UPDATE `creature_template` SET `modelid1`= 1065, `family` = 56,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Zombie', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-68    Hydre - CREATURE_FAMILY_HYDRA								UPDATE `creature_template` SET `modelid1`= 2423, `family` = 68,`InhabitType` = 3, `unit_class` = 1,`name` = 'npc_ai_Hydre', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-100   Diablotin gangrene - CREATURE_FAMILY_FELIMP				UPDATE `creature_template` SET `modelid1`= 16890,`family` =100,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Diablotin gangrene', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-104   Garde-courroux - CREATURE_FAMILY_WRATHGUARD				UPDATE `creature_template` SET `modelid1`= 63969,`family` =104,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Garde-courroux', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-108   Infernal - CREATURE_FAMILY_INFERNAL						UPDATE `creature_template` SET `modelid1`= 169,`family` =108,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Infernal', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-116   elementaire de feu - CREATURE_FAMILY_FIREELEMENTAL		UPDATE `creature_template` SET `modelid1`= 1405,`family` =116,`InhabitType` = 1, `unit_class` = 2,`name` = 'npc_ai_elementaire de feu', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-117   elementaire de terre - CREATURE_FAMILY_EARTHELEMENTAL		UPDATE `creature_template` SET `modelid1`= 14511,`family` =117,`InhabitType` = 1, `unit_class` = 2,`name` = 'npc_ai_elementaire de terre', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-130   Basilic - CREATURE_FAMILY_BASILISK						UPDATE `creature_template` SET `modelid1`= 46056,`family` =130,`InhabitType` = 1, `unit_class` = 1,`name` = 'npc_ai_Basilic', `ScriptName` = 'Stitch_npc_ai_mobs' WHERE (entry = 15100015);
-*/
-
-// Il est possible d'influencer le temp entre 2 cast avec `BaseAttackTime` & `RangeAttackTime` 
-// Necessite dans Creature_Template :
-// Minimun  : UPDATE `creature_template` SET `ScriptName` = 'Stitch_npc_ai_mobs',`AIName` = '' WHERE (entry = 15100015);
-// Optionel : UPDATE `creature_template` SET `HealthModifier` = 2, `ManaModifier` = 3, `ArmorModifier` = 1, `DamageModifier` = 2,`BaseAttackTime` = 2000, `RangeAttackTime` = 2000 WHERE(entry = 15100013);
-// REPLACE INTO `creature_template` (`entry`, `difficulty_entry_1`, `difficulty_entry_2`, `difficulty_entry_3`, `KillCredit1`, `KillCredit2`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, `name`, `femaleName`, `subname`, `IconName`, `gossip_menu_id`, `minlevel`, `maxlevel`, `exp`, `exp_unk`, `faction`, `npcflag`, `speed_walk`, `speed_run`, `scale`, `rank`, `dmgschool`, `BaseAttackTime`, `RangeAttackTime`, `BaseVariance`, `RangeVariance`, `unit_class`, `unit_flags`, `unit_flags2`, `dynamicflags`, `family`, `trainer_type`, `trainer_class`, `trainer_race`, `type`, `type_flags`, `type_flags2`, `lootid`, `pickpocketloot`, `skinloot`, `resistance1`, `resistance2`, `resistance3`, `resistance4`, `resistance5`, `resistance6`, `spell1`, `spell2`, `spell3`, `spell4`, `spell5`, `spell6`, `spell7`, `spell8`, `VehicleId`, `mingold`, `maxgold`, `AIName`, `MovementType`, `InhabitType`, `HoverHeight`, `HealthModifier`, `HealthModifierExtra`, `ManaModifier`, `ManaModifierExtra`, `ArmorModifier`, `DamageModifier`, `ExperienceModifier`, `RacialLeader`, `movementId`, `RegenHealth`, `mechanic_immune_mask`, `flags_extra`, `ScriptName`, `VerifiedBuild`) VALUES
-// (15100015, 0, 0, 0, 0, 0, 903, 0, 0, 0, 'npc_ai_Loup', '', '', '', 0, 90, 90, 0, 0, 2102, 0, 1.01, 1.01, 0.75, 0, 0, 2000, 2000, 1, 1, 1, 0, 2048, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 0, 3, 1, 2, 1, 1, 1, 2, 2, 1, 0, 144, 1, 0, 0, 'Stitch_npc_ai_mobs', 20173);
 //###########################################################################################################################################################################################################################################
 
 
@@ -154,9 +96,10 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 			uint32 Spell_Bondir_Guerrier = 145763;								// Bondir 8-40m
 			uint32 Spell_Invisible = 1784;										// Invisibilitée fufu
 			uint32 Spell_No_ModelID = 137358;									// ModelID non visible , arme && aura visible 
-			uint32 Spell_Senterre = 79690;										// visuel terre Forage de tunnel Passif gris percistant
-			uint32 Spell_Senterre_sans_fumee = 84863;							// visuel terre Forage de tunnel Passif gris  
-			uint32 Spell_Sedeterre_sans_fumee = 164339;							// visuel explosion de fumée   
+			uint32 Spell_Senterre = 79690;										// fumée persistante - visuel terre Forage de tunnel Passif gris percistant
+			uint32 Spell_Senterre_sans_fumee = 84863;							// fumée temporaire - visuel terre Forage de tunnel Passif gris  
+			uint32 Spell_Sedeterre_sans_fumee = 164339;							// visuel explosion de fumée au retrait 
+			uint32 Spell_Senterre_remou_clair = 29147;							// visuel terre remué claire pour Ver
 			uint32 Spell_Gaz_Corrosif = 126437;
 			uint32 Spell_Armure_De_Givre = 165743;
 			uint32 Spell_Armure_De_La_Fournaise = 79849;
@@ -516,6 +459,19 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 			uint32 liste_spell_B_159[4] = { 119004, 3358, 26419, 79607 };		// Violent coup direct 119004, Poison de sangsue (5m,Draine) 3358, pluie d acide 26419,poison (catapulte,zone) 79607
 			uint32 liste_agro_159[2] = { 49576, 128425 };						// Poigne de la mort 49576, Résine corrosive 128425 
 			uint32 liste_Buf_159[2] = { 126336, 87228 };						// Poix caustique 126336, Peau épaisse 87228
+
+			// 160	CUSTOM - CREATURE_FAMILY_TOURELLE_FIXE
+			uint32 liste_spell_A_160[3] = { 36238, 9053,43799 };				// Tir de gangrecanon 36238, Boule de feu 9053, Mitrailleuse 43799
+			uint32 liste_spell_B_160[2] = { 300241, 1543 };						// Tir explosif 300241, Fusée éclairante 1543
+			uint32 liste_agro_160[2] = { 49576, 18396 };						// Résine corrosive 128425, Explosion désarçonnante 18396
+			uint32 liste_Buf_160[2] = { 5915, 18148 };							// Hystérique 5915, Champ statique (DMG proche) 18148
+
+			// 161	CUSTOM - CREATURE_FAMILY_SENTERRE_REMOU_CLAIR_CONTACT
+			uint32 liste_spell_A_161[2] = { 113687, 113687 };					// Morsure
+			uint32 liste_spell_B_161[4] = { 84867, 79872, 84867, 79872 };		// Balayage fracassant (cum 5 fois) 84867, Onde de choc 79872
+			uint32 liste_agro_161[2] = { 113967, 35328 };						// Barbelés d'épines 113967, Sang diapré 35328 (Impossible d'utiliser Camouflage)
+			uint32 liste_Buf_161[2] = { 22863, 22863 };							// Vitesse 22863 (10s/30%)
+
 
 			void InitializeAI()
 			{
@@ -910,11 +866,24 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							break;
 						case 159:	// CUSTOM - CREATURE_FAMILY_SENTERRE_FIXE
 							Spell_A = liste_spell_A_159[urand(0, 2)];
-							Spell_B = liste_spell_B_159[urand(0, 3)];
+							Spell_B = liste_spell_B_159[urand(0, 1)];
 							Spell_agro = liste_agro_159[urand(0, 1)];
 							Buf_A = liste_Buf_159[urand(0, 1)];
 							break;
 
+						case 160:	// CREATURE_FAMILY_TOURELLE_FIXE
+							Spell_A = liste_spell_A_160[urand(0, 2)];
+							Spell_B = liste_spell_B_160[urand(0, 1)];
+							Spell_agro = liste_agro_160[urand(0, 1)];
+							Buf_A = liste_Buf_160[urand(0, 1)];
+							break;
+
+						case 161:		// CREATURE_FAMILY_SE_DETERRE_AU_CONTACT
+							Spell_A = liste_spell_A_161[urand(0, 1)];
+							Spell_B = liste_spell_B_161[urand(0, 3)];
+							Spell_agro = liste_agro_161[urand(0, 1)];
+							Buf_A = liste_Buf_161[urand(0, 1)];
+							break;
 
 						default:
 							Spell_A = liste_spell_A_0[urand(0, 1)];
@@ -1012,7 +981,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE) 
 				{
 					me->StopMoving();
-					me->GetMotionMaster()->MoveIdle();
+					//me->GetMotionMaster()->MoveIdle();
 				}
 
 				//Retire certaines Aura, emotes & Bytes a l'agro
@@ -2542,7 +2511,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Cooldown_Trop_Loin_Defaut = urand(8000, 10000);
 							break;
 						case 156:	//CREATURE_FAMILY_SE_DETERRE_AU_CONTACT - AI : 1/3_Mouvement_Contact_Basique, 1/3_Mouvement_Contact_Tournant_Aleatoire, 1/3_Mouvement_Contact_Avance_Recule
-							AI_Random = urand(1, 3);
+							AI_Random = urand(1, 5);
 							me->SetMeleeDamageSchool(SpellSchools(0));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
 							Spell_B_Non_Cumulable = 0;
 							//Spell_respawn_evade = 0;
@@ -2671,6 +2640,51 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 							Spell_B_Non_Cumulable = 0;
 							break;
 
+						case 160:	//CREATURE_FAMILY_TOURELLE_FIXE
+							me->SetMeleeDamageSchool(SpellSchools(0));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
+							Spell_B_Non_Cumulable = 0;
+							Spell_respawn_evade = 0;
+							Spell_Heal = 0;
+							Cooldown_SpellA = 1000;
+							Cooldown_SpellA_defaut = urand(3000, 4000);
+							Cooldown_SpellB = 2000;
+							Cooldown_SpellB_defaut = urand(5000, 6000);
+							Cooldown_SpellB_rapide = 4000;
+							Cooldown_SpellB_rapide_defaut = Cooldown_SpellB_defaut;
+							Cooldown_Spell_Heal_defaut = 15000;
+							Cooldown_Principal_A = 1000;
+							Cooldown_Principal_A_Defaut = 1000;
+							Cooldown_Principal_B = 100;
+							Cooldown_Principal_B_Defaut = 2000;
+							ResteADistance = 40;
+							Spell_Trop_Loin = 0;
+							Cooldown_Trop_Loin = urand(6000, 8000);
+							Cooldown_Trop_Loin_Defaut = urand(6000, 8000);
+							Spell_B_Non_Cumulable = 0;
+							break;
+
+						case 161:	//CREATURE_FAMILY_SENTERRE_REMOU_CLAIR_CONTACT - AI : Mouvement_Contact_Basique
+							me->SetMeleeDamageSchool(SpellSchools(0));														// Physique=0, Sacré=1, Feu=2, Nature=3, Givre=4, Ombre=5, Arcane=6
+							Spell_B_Non_Cumulable = 0;
+							//Spell_respawn_evade = 0;
+							//Spell_Heal = 0;
+							Cooldown_SpellA = 1000;
+							Cooldown_SpellA_defaut = Base_Cooldown_Cast_A;
+							Cooldown_SpellB = 2500;
+							Cooldown_SpellB_defaut = Base_Cooldown_Cast_B + 2000;
+							Cooldown_SpellB_rapide = Base_Cooldown_Cast_B - 2000;
+							Cooldown_SpellB_rapide_defaut = Base_Cooldown_Cast_B;
+							Cooldown_Spell_Heal_defaut = 0;
+							Cooldown_Principal_A = 1000;
+							Cooldown_Principal_A_Defaut = 1000;
+							Cooldown_Principal_B = urand(3000, 5000);
+							Cooldown_Principal_B_Defaut = urand(4000, 6000);
+							ResteADistance = 5;
+							Spell_Trop_Loin = 0;																			// 	
+							Cooldown_Trop_Loin = 1000;
+							Cooldown_Trop_Loin_Defaut = urand(5000, 7000);
+							break;
+
 						default:
 							//Spell_agro = 0;
 							//Spell_respawn_evade = 0;
@@ -2736,7 +2750,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 						// ########################################################################################################################################
 					if (Start_Agro2 == 0)
 					{
-						if (Dist < 3 || Spell_agro_isdistant(Spell_agro) == true)
+						if (Dist < 3 || Spell_agro_isdistant(Spell_agro) == true )
 						{
 							Random = urand(1, 5);								// 3 Chance sur 5 de lancer le sort sur la cible a d'agro
 							if (Random < 4 && Spell_agro != 0)
@@ -2749,7 +2763,8 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 						}
 
 						if (Crfamily == CREATURE_FAMILY_SE_DETERRE_AU_CONTACT && Dist > 3 && me->HasAura(Spell_No_ModelID))
-							me->CastSpell(me, 300285, true);
+							me->CastSpell(me, 300285, true); //Sous terre (inspiré de 164339, no_model , fumé)
+
 
 
 					}
@@ -3130,8 +3145,12 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 						case 159:	//CREATURE_FAMILY_SENTERRE_FIXE
 							Mouvement_Fixe(diff);
 							break;
-
-
+						case 160:	//CREATURE_FAMILY_TOURELLE_FIXE
+							Mouvement_Fixe(diff);
+							break;
+						case 161:	// CUSTOM - CREATURE_FAMILY_SE_DETERRE_AU_CONTACT
+								Mouvement_Contact_Basique(diff);
+							break;
 
 						default:
 							Mouvement_Contact_Basique(diff);
@@ -3842,7 +3861,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				me->CastSpell(me, Spell_Sedeterre_sans_fumee, true);							// Pour visuel sedeterrer
 				me->CastSpell(me, Spell_No_ModelID, true);										// Masque le ModelID
 				me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);						// Non selectionnable
-				me->RemoveAura(79690);
+				me->RemoveAura(Spell_Senterre);															// fumée
 			}
 			void Se_Deterre()
 			{
@@ -3853,9 +3872,25 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				me->RemoveAurasDueToSpell(Spell_No_ModelID);									// Retire invisible
 				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);						// Selectionnable
 			}
+			void Senterre_remou_clair()
+			{
+				me->CastSpell(me, Spell_Senterre_remou_clair, true);							// Fumée et terre remuée Temporaire
+				me->CastSpell(me, Spell_Sedeterre_sans_fumee, true);							// Pour visuel sedeterrer
+				me->CastSpell(me, Spell_No_ModelID, true);										// Masque le ModelID
+				me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);						// Non selectionnable
+			}
 			void Se_DeterreSansFumee()
 			{
+				me->RemoveAurasDueToSpell(Spell_Senterre);
 				me->RemoveAurasDueToSpell(Spell_Senterre_sans_fumee);							// Retire fumée et terre remuée Temporaire
+				me->RemoveAurasDueToSpell(Spell_Sedeterre_sans_fumee);							// Visuel explosion de fumée
+				me->RemoveAurasDueToSpell(Spell_No_ModelID);									// Retire invisible
+				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);						// Selectionnable
+			}
+			void Se_Deterre_remou_clair()
+			{
+				me->RemoveAurasDueToSpell(Spell_Senterre);
+				me->RemoveAurasDueToSpell(Spell_Senterre_remou_clair);							// Retire fumée et terre remuée Temporaire
 				me->RemoveAurasDueToSpell(Spell_Sedeterre_sans_fumee);							// Visuel explosion de fumée
 				me->RemoveAurasDueToSpell(Spell_No_ModelID);									// Retire invisible
 				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);						// Selectionnable
@@ -3901,7 +3936,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				if (Crfamily == CREATURE_FAMILY_SENTERRE /*155*/ && !me->HasUnitState(UNIT_STATE_MOVE))
 				{
 					Random = urand(1, 3);
-					if (Random == 1)
+					if (Random > 1)
 					{
 						Senterre();
 					}
@@ -3917,7 +3952,6 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					{
 						Senterre_sans_fumee();
 					}
-
 				}
 
 				if (Crfamily == CREATURE_FAMILY_MORPH_ROCHER  /*157*/ && !me->HasUnitState(UNIT_STATE_MOVE))
@@ -3928,6 +3962,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				//Custom 159
 				if (Crfamily == CREATURE_FAMILY_SENTERRE_FIXE /*159*/)
 				{
+					me->GetMotionMaster()->MoveTargetedHome();										// Retour home
 					me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);							// ROOT
 					Random = urand(1, 3);
 					if (Random != 1)
@@ -3936,6 +3971,18 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					}
 				}
 
+				//Custom 160
+				if (Crfamily == CREATURE_FAMILY_TOURELLE_FIXE /*160*/)
+				{
+					me->GetMotionMaster()->MoveTargetedHome();										// Retour home
+					me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);							// ROOT
+				}
+
+				// Custom 161
+				if (Crfamily == CREATURE_FAMILY_SENTERRE_REMOU_CLAIR_CONTACT )
+				{
+					Senterre_remou_clair();
+				}
 			}
 			void Family_Special_Retire_a_l_Agro()
 			{
@@ -3954,14 +4001,28 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					Se_DeterreSansFumee();
 						//Se_Deterre();
 				}
+
+
+
+				if (me->HasAura(34038))
+				{
+					me->RemoveAurasDueToSpell(34038); // remou de terre sombre
+				}
+				
 			}
 			void Family_Special_Retire_au_contact()
 			{
+
+
 				if (Crfamily == CREATURE_FAMILY_SE_DETERRE_AU_CONTACT /*156 && me->GetMotionMaster()->GetCurrentMovementGeneratorType() != IDLE_MOTION_TYPE*/)
 				{
 					Se_Deterre();
-					me->RemoveAurasDueToSpell(300285);									//
-
+					me->RemoveAurasDueToSpell(300285);									//Sous terre (inspiré de 164339, no_model , fumé)
+				}
+				if (Crfamily == CREATURE_FAMILY_SENTERRE_REMOU_CLAIR_CONTACT /*161*/)
+				{
+					Se_Deterre_remou_clair();
+					me->RemoveAurasDueToSpell(300285);									//Sous terre (inspiré de 164339, no_model , fumé)
 				}
 			}
 
@@ -4046,6 +4107,7 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 					|| me->HasAura(20170)	// Sceau de justice 20170
 					|| me->HasAura(6343)	// Coup de tonnerre
 					|| me->HasAura(8147)	// Coup de tonnerre
+					|| me->HasAura(3600)	// Totem de Lien à la terre
 					) return true;
 				else return false;
 			}
@@ -4054,13 +4116,23 @@ public: Stitch_npc_ai_mobs() : CreatureScript("Stitch_npc_ai_mobs") { }
 				if (me->HasAura(122)		// Nova de givre
 					|| me->HasAura(3600)	// Totem de lien terrestre
 					|| me->HasAura(6474)	// Totem de lien terrestre passif
+					|| me->HasAura(33844)	// Sarments 4s
+					|| me->HasAura(22127)	// Sarments 6s
+					|| me->HasAura(31409)	// Sarment multiple
+					|| me->HasAura(160402)	// Emprise terrestre (4s, 30m, comme Sarment mais avec des rocher )
+					|| me->HasAura(45524)	// Chaînes de glace
+					|| me->HasAura(853)		// Marteau de la justice
+					|| me->HasAura(339)		// Sarment du Totem de poigne de terre
+					|| me->HasAura(64695)	// Sarment du Totem de poigne de terre
+					|| me->HasAura(125467)	// Auto ROOT
+					|| me->HasAura(31736)	// Quete 9720
 					) return true;
 				else return false;
 			}
 
 			bool Spell_agro_isdistant(uint32 spell_Id)
 			{
-				if (spell_Id == 0 || !UpdateVictim())
+				if (spell_Id == 0 || !UpdateVictim() || Crfamily == CREATURE_FAMILY_SENTERRE_REMOU_CLAIR_CONTACT || Crfamily == CREATURE_FAMILY_SE_DETERRE_AU_CONTACT)
 				return false;
 				
 				SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell_Id);
