@@ -2051,7 +2051,7 @@ void Player::Regenerate(Powers power)
 			//addvalue += GetFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER) *  ManaIncreaseRate /* * ((0.001f * m_regenTimer) + CalculatePct(0.001f, spellHaste))*/;
 		{
 			addvalue += GetFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER) *  ManaIncreaseRate;
-			addvalue = (addvalue - Level) *1.2f ; 
+			//addvalue = (addvalue - Level) *1.2f ; 
 		}
 		else
 			//addvalue += GetFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER) *  ManaIncreaseRate * ((0.001f * m_regenTimer) + CalculatePct(0.001f, spellHaste));
@@ -8324,9 +8324,6 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
                             // GroupLoot: rolls items over threshold. Items with quality < threshold, round robin
                             group->GroupLoot(loot, go);
                             break;
-                        case NEED_BEFORE_GREED:
-                            group->NeedBeforeGreed(loot, go);
-                            break;
                         case MASTER_LOOT:
                             group->MasterLoot(loot, go);
                             break;
@@ -8350,9 +8347,6 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
                         break;
                     case FREE_FOR_ALL:
                         permission = ALL_PERMISSION;
-                        break;
-                    case ROUND_ROBIN:
-                        permission = ROUND_ROBIN_PERMISSION;
                         break;
                     default:
                         permission = GROUP_PERMISSION;
@@ -8500,9 +8494,6 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
                             // GroupLoot: rolls items over threshold. Items with quality < threshold, round robin
                             group->GroupLoot(loot, creature);
                             break;
-                        case NEED_BEFORE_GREED:
-                            group->NeedBeforeGreed(loot, creature);
-                            break;
                         case MASTER_LOOT:
                             group->MasterLoot(loot, creature);
                             break;
@@ -8539,9 +8530,6 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
                                 break;
                             case FREE_FOR_ALL:
                                 permission = ALL_PERMISSION;
-                                break;
-                            case ROUND_ROBIN:
-                                permission = ROUND_ROBIN_PERMISSION;
                                 break;
                             default:
                                 permission = GROUP_PERMISSION;
@@ -11219,7 +11207,7 @@ InventoryResult Player::CanUseItem(Item* pItem, bool not_loading) const
 
 InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
 {
-    // Used by group, function NeedBeforeGreed, to know if a prototype can be used by a player
+    // Used by group, function GroupLoot, to know if a prototype can be used by a player
 
     if (!proto)
         return EQUIP_ERR_ITEM_NOT_FOUND;
@@ -11262,79 +11250,70 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
 
 InventoryResult Player::CanRollForItemInLFG(ItemTemplate const* proto, WorldObject const* lootedObject) const
 {
-    if (!GetGroup() || !GetGroup()->isLFGGroup())
-        return EQUIP_ERR_OK;    // not in LFG group
+	if (!GetGroup() || !GetGroup()->isLFGGroup())
+		return EQUIP_ERR_OK;    // not in LFG group
 
-    // check if looted object is inside the lfg dungeon
-    Map const* map = lootedObject->GetMap();
-    if (!sLFGMgr->inLfgDungeonMap(GetGroup()->GetGUID(), map->GetId(), map->GetDifficultyID()))
-        return EQUIP_ERR_OK;
+								// check if looted object is inside the lfg dungeon
+	Map const* map = lootedObject->GetMap();
+	if (!sLFGMgr->inLfgDungeonMap(GetGroup()->GetGUID(), map->GetId(), map->GetDifficultyID()))
+		return EQUIP_ERR_OK;
 
-    if (!proto)
-        return EQUIP_ERR_ITEM_NOT_FOUND;
-   // Used by group, function NeedBeforeGreed, to know if a prototype can be used by a player
+	if (!proto)
+		return EQUIP_ERR_ITEM_NOT_FOUND;
 
-    const static uint32 item_weapon_skills[MAX_ITEM_SUBCLASS_WEAPON] =
-    {
-        SKILL_AXES,     SKILL_2H_AXES,  SKILL_BOWS,          SKILL_GUNS,      SKILL_MACES,
-        SKILL_2H_MACES, SKILL_POLEARMS, SKILL_SWORDS,        SKILL_2H_SWORDS, 0,
-        SKILL_STAVES,   0,              0,                   SKILL_FIST_WEAPONS,   0,
-        SKILL_DAGGERS,  SKILL_THROWN,   SKILL_ASSASSINATION, SKILL_CROSSBOWS, SKILL_WANDS,
-        SKILL_FISHING
-    }; //Copy from function Item::GetSkill()
+	// Used by group, function GroupLoot, to know if a prototype can be used by a player
+	if ((proto->GetAllowableClass() & getClassMask()) == 0 || (proto->GetAllowableRace() & getRaceMask()) == 0)
+		return EQUIP_ERR_CANT_EQUIP_EVER;
 
-    if ((proto->GetAllowableClass() & getClassMask()) == 0 || (proto->GetAllowableRace() & getRaceMask()) == 0)
-        return EQUIP_ERR_CANT_EQUIP_EVER;
+	if (proto->GetRequiredSpell() != 0 && !HasSpell(proto->GetRequiredSpell()))
+		return EQUIP_ERR_PROFICIENCY_NEEDED;
 
-    if (proto->GetRequiredSpell() != 0 && !HasSpell(proto->GetRequiredSpell()))
-        return EQUIP_ERR_PROFICIENCY_NEEDED;
+	if (proto->GetRequiredSkill() != 0)
+	{
+		if (!GetSkillValue(proto->GetRequiredSkill()))
+			return EQUIP_ERR_PROFICIENCY_NEEDED;
+		else if (GetSkillValue(proto->GetRequiredSkill()) < proto->GetRequiredSkillRank())
+			return EQUIP_ERR_CANT_EQUIP_SKILL;
+	}
 
-    if (proto->GetRequiredSkill() != 0)
-    {
-        if (!GetSkillValue(proto->GetRequiredSkill()))
-            return EQUIP_ERR_PROFICIENCY_NEEDED;
-        else if (GetSkillValue(proto->GetRequiredSkill()) < proto->GetRequiredSkillRank())
-            return EQUIP_ERR_CANT_EQUIP_SKILL;
-    }
+	uint8 _class = getClass();
 
-    uint8 _class = getClass();
+	if (proto->GetClass() == ITEM_CLASS_WEAPON && GetSkillValue(proto->GetSkill()) == 0)
+		return EQUIP_ERR_PROFICIENCY_NEEDED;
 
-    if (proto->GetClass() == ITEM_CLASS_WEAPON && GetSkillValue(item_weapon_skills[proto->GetSubClass()]) == 0)
-        return EQUIP_ERR_PROFICIENCY_NEEDED;
+	if (proto->GetClass() == ITEM_CLASS_ARMOR && proto->GetSubClass() > ITEM_SUBCLASS_ARMOR_MISCELLANEOUS && proto->GetSubClass() < ITEM_SUBCLASS_ARMOR_BUCKLER && proto->GetInventoryType() != INVTYPE_CLOAK)
+	{
+		if (_class == CLASS_WARRIOR || _class == CLASS_PALADIN || _class == CLASS_DEATH_KNIGHT)
+		{
+			if (getLevel() < 40)
+			{
+				if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_MAIL)
+					return EQUIP_ERR_CLIENT_LOCKED_OUT;
+			}
+			else if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_PLATE)
+				return EQUIP_ERR_CLIENT_LOCKED_OUT;
+		}
+		else if (_class == CLASS_HUNTER || _class == CLASS_SHAMAN)
+		{
+			if (getLevel() < 40)
+			{
+				if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_LEATHER)
+					return EQUIP_ERR_CLIENT_LOCKED_OUT;
+			}
+			else if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_MAIL)
+				return EQUIP_ERR_CLIENT_LOCKED_OUT;
+		}
 
-    if (proto->GetClass() == ITEM_CLASS_ARMOR && proto->GetSubClass() > ITEM_SUBCLASS_ARMOR_MISCELLANEOUS && proto->GetSubClass() < ITEM_SUBCLASS_ARMOR_BUCKLER && proto->GetInventoryType() != INVTYPE_CLOAK)
-    {
-        if (_class == CLASS_WARRIOR || _class == CLASS_PALADIN || _class == CLASS_DEATH_KNIGHT)
-        {
-            if (getLevel() < 40)
-            {
-                if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_MAIL)
-                    return EQUIP_ERR_CLIENT_LOCKED_OUT;
-            }
-            else if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_PLATE)
-                return EQUIP_ERR_CLIENT_LOCKED_OUT;
-        }
-        else if (_class == CLASS_HUNTER || _class == CLASS_SHAMAN)
-        {
-            if (getLevel() < 40)
-            {
-                if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_LEATHER)
-                    return EQUIP_ERR_CLIENT_LOCKED_OUT;
-            }
-            else if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_MAIL)
-                return EQUIP_ERR_CLIENT_LOCKED_OUT;
-        }
+		if (_class == CLASS_ROGUE || _class == CLASS_DRUID)
+			if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_LEATHER)
+				return EQUIP_ERR_CLIENT_LOCKED_OUT;
 
-        if (_class == CLASS_ROGUE || _class == CLASS_DRUID)
-            if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_LEATHER)
-                return EQUIP_ERR_CLIENT_LOCKED_OUT;
+		if (_class == CLASS_MAGE || _class == CLASS_PRIEST || _class == CLASS_WARLOCK)
+			if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_CLOTH)
+				return EQUIP_ERR_CLIENT_LOCKED_OUT;
+	}
 
-        if (_class == CLASS_MAGE || _class == CLASS_PRIEST || _class == CLASS_WARLOCK)
-            if (proto->GetSubClass() != ITEM_SUBCLASS_ARMOR_CLOTH)
-                return EQUIP_ERR_CLIENT_LOCKED_OUT;
-    }
-
-    return EQUIP_ERR_OK;
+	return EQUIP_ERR_OK;
 }
 
 // Return stored item (if stored to stack, it can diff. from pItem). And pItem ca be deleted in this case.
@@ -17436,15 +17415,7 @@ bool Player::isAllowedToLoot(const Creature* creature)
         case MASTER_LOOT:
         case FREE_FOR_ALL:
             return true;
-        case ROUND_ROBIN:
-            // may only loot if the player is the loot roundrobin player
-            // or if there are free/quest/conditional item for the player
-            if (loot->roundRobinPlayer.IsEmpty() || loot->roundRobinPlayer == GetGUID())
-                return true;
-
-            return loot->hasItemFor(this);
         case GROUP_LOOT:
-        case NEED_BEFORE_GREED:
             // may only loot if the player is the loot roundrobin player
             // or item over threshold (so roll(s) can be launched)
             // or if there are free/quest/conditional item for the player
@@ -24742,13 +24713,13 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
         return;
     }
 
-//Stitch bug loot item de quete
+//Stitch item de quete : bug loot
 	// dont allow protected item to be looted by someone else
-	if (!item->rollWinnerGUID.IsEmpty() && item->rollWinnerGUID != GetGUID())
-	{
-		SendLootRelease(GetLootGUID());
-		return;
-	}
+	//if (!item->rollWinnerGUID.IsEmpty() && item->rollWinnerGUID != GetGUID())
+	//{
+	//	SendLootRelease(GetLootGUID());
+	//	return;
+	//}
 
     ItemPosCountVec dest;
     InventoryResult msg = CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, item->itemid, item->count);
@@ -26251,7 +26222,7 @@ void Player::OnCombatExit()
 
     UpdatePotionCooldown();
     if (getClass() == CLASS_PALADIN)
-        m_holyPowerRegenTimerCount = 20000; // first charge of holy power decays 20 seconds after leaving combat
+        m_holyPowerRegenTimerCount = 2000; // first charge of holy power decays 20 seconds after leaving combat
 }
 
 void Player::CreateGarrison(uint32 garrSiteId)
